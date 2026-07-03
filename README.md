@@ -50,7 +50,8 @@ Future simulations planned include:
 - Constraints and joints
 
 ## Screenshots
-
+-Main Menu
+![Main Menu](src/screenshots/menu.png)
 
 ## How to Build
 
