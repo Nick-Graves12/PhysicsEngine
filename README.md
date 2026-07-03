@@ -51,7 +51,8 @@ Future simulations planned include:
 
 ## Screenshots
 -Main Menu
-![Main Menu](src/screenshots/menu.png)
+
+![Main Menu](screenshots/menu.png)
 
 ## How to Build
 
