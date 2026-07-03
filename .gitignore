@@ -1,0 +1,15 @@
+build/
+.DS_Store
+.vscode/
+
+# CMake
+CMakeFiles/
+.cmake/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Executables
+PhysicsEngine
+*.app
