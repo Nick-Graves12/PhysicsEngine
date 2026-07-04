@@ -9,6 +9,20 @@ struct FluidParticle
     float radius;
 };
 
+struct FluidBox
+{
+    Vector2 position;
+    Vector2 velocity;
+
+    float width;
+    float height;
+
+    float rotation;
+    float angularVelocity;
+
+    float mass;
+};
+
 class FluidWorld
 {
 public:
@@ -30,4 +44,12 @@ private:
     void ResolveWallCollisions(FluidParticle& particle);
     void ResolveParticleCollisions();
     float inputDelay = 0.0f;
+
+    std::vector<FluidBox> boxes;
+    Rectangle tank;
+
+    void SpawnBox(Vector2 position);
+    void UpdateBoxes(float dt);
+    void ResolveBoxWallCollisions(FluidBox& box);
+    void ApplyBuoyancy(FluidBox& box);
 };

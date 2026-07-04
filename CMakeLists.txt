@@ -17,3 +17,9 @@ add_executable(PhysicsEngine src/main.cpp
 )
 
 target_link_libraries(PhysicsEngine PRIVATE raylib)
+
+add_custom_command(TARGET PhysicsEngine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/resources
+    $<TARGET_FILE_DIR:PhysicsEngine>/resources
+)

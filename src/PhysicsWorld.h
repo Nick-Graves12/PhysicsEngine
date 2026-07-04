@@ -2,11 +2,11 @@
 
 #include <vector>
 #include "RigidBody.h"
+#include "raylib.h"
 
 struct PhysicsWorld
 {
-    std::vector<RigidBody> bodies;
-
+public:
     float gravity = 400.0f;
     int screenWidth = 800;
     int screenHeight = 600;
@@ -17,4 +17,11 @@ struct PhysicsWorld
     RigidBody& GetBody(int index);
     int GetBodyCount() const;
     void Reset();
+    void RemoveBody(int index);
+
+private:
+    std::vector<RigidBody> bodies;
+    Rectangle arena;
+
+    void CheckArenaCollision(RigidBody& body);
 };

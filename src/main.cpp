@@ -7,6 +7,20 @@
 #include "Physics.h"
 #include "OrbitalWorld.h"
 #include "FluidWorld.h"
+
+Font uiFont;
+
+void UIText(const char* text, float x, float y, float size, Color color)
+{
+    DrawTextEx(
+        uiFont,
+        text,
+        { x, y },
+        size,
+        1.0f,
+        color
+    );
+}
 enum class AppState
 {
     MainMenu,
@@ -33,8 +47,8 @@ bool IsMouseOverMassSlider();
 bool IsMouseOverUI()
 {
     return IsMouseOverMassSlider() ||
-           IsMouseOverRect(10, 330, 120, 35) ||
-           IsMouseOverRect(140, 330, 120, 35);
+           IsMouseOverRect(650, 335, 120, 32) ||
+           IsMouseOverRect(650, 355 + 32 , 120, 32);
 }
 
 
@@ -70,6 +84,145 @@ void SpawnBodyAtMouse(PhysicsWorld& world, SpawnMode mode, float radius)
     world.AddBody(newBody);
 }
 
+void SpawnBodyWithVelocity(PhysicsWorld& world, SpawnMode mode, float radius, Vector2 position, Vector2 velocity)
+{
+    RigidBody newBody = CreateRigidBody(
+        position.x,
+        position.y,
+        radius,
+        1
+    );
+
+    if (mode == SPAWN_STATIC)
+    {
+        newBody.isStatic = true;
+        newBody.velocity.x = 0;
+        newBody.velocity.y = 0;
+    }
+    else
+    {
+        newBody.velocity.x = velocity.x;
+        newBody.velocity.y = velocity.y;
+    }
+
+    world.AddBody(newBody);
+}
+
+int GetBodyIndexAtMouse(PhysicsWorld& world)
+{
+    Vector2 mouse = GetMousePosition();
+
+    for (int i = world.GetBodyCount() - 1; i >= 0; i--)
+    {
+        RigidBody& body = world.GetBody(i);
+
+        float dx = mouse.x - body.position.x;
+        float dy = mouse.y - body.position.y;
+        float distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared <= body.radius * body.radius)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void DrawSelectedBodyOutline(PhysicsWorld& world, int selectedBodyIndex)
+{
+    if (selectedBodyIndex < 0 || selectedBodyIndex >= world.GetBodyCount())
+    {
+        return;
+    }
+
+    RigidBody& body = world.GetBody(selectedBodyIndex);
+
+    DrawCircleLines(
+        body.position.x,
+        body.position.y,
+        body.radius + 4,
+        BLUE);
+
+    DrawCircleLines(
+        body.position.x,
+        body.position.y,
+        body.radius + 6,
+        SKYBLUE);
+}
+
+void DrawVelocityVectors(PhysicsWorld& world)
+{
+    for (int i = 0; i < world.GetBodyCount(); i++)
+    {
+        RigidBody& body = world.GetBody(i);
+
+        if (body.isStatic)
+        {
+            continue;
+        }
+
+        float scale = 0.15f;
+
+        Vector2 start = {
+            body.position.x,
+            body.position.y
+        };
+
+        Vector2 end = {
+            body.position.x + body.velocity.x * scale,
+            body.position.y + body.velocity.y * scale
+        };
+
+        DrawLineEx(start, end, 2.0f, RED);
+
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float length = sqrt(dx * dx + dy * dy);
+
+        if (length > 0.01f)
+        {
+            dx /= length;
+            dy /= length;
+
+            Vector2 left = {
+                end.x - dx * 10 - dy * 5,
+                end.y - dy * 10 + dx * 5
+            };
+
+            Vector2 right = {
+                end.x - dx * 10 + dy * 5,
+                end.y - dy * 10 - dx * 5
+            };
+
+            DrawLineEx(end, left, 2.0f, RED);
+            DrawLineEx(end, right, 2.0f, RED);
+        }
+    }
+}
+
+void DrawSpawnTrajectoryPreview(Vector2 start, Vector2 current, float radius)
+{
+    DrawCircleLines(start.x, start.y, radius, DARKGRAY);
+
+    DrawLineEx(current, start, 2.0f, DARKGRAY);
+
+    float dx = start.x - current.x;
+    float dy = start.y - current.y;
+
+    Vector2 previewVelocity = {
+        dx * 3.0f,
+        dy * 3.0f
+    };
+
+    Vector2 arrowEnd = {
+        start.x + previewVelocity.x * 0.15f,
+        start.y + previewVelocity.y * 0.15f
+    };
+
+    DrawLineEx(start, arrowEnd, 3.0f, BLUE);
+}
+
 void HandlePlayerInput(PhysicsWorld& world, float dt)
 {
     if (world.GetBodyCount() == 0)
@@ -99,37 +252,69 @@ void HandlePlayerInput(PhysicsWorld& world, float dt)
     }
 }
 
-void DrawDebugOverlay(const PhysicsWorld& world, SpawnMode spawnMode, float spawnRadius)
+void UILabelValue(const char* label, const char* value,
+                  float x, float y)
 {
-    DrawText(TextFormat("Bodies: %i", world.GetBodyCount()), 10, 10, 20, DARKGRAY);
-    DrawText(TextFormat("FPS: %i", GetFPS()), 10, 35, 20, DARKGRAY);
+    UIText(label, x, y, 16, DARKBLUE);
+    UIText(value, x + 60, y, 16, BLACK);
+}
+
+void DrawUIOverlay(const PhysicsWorld& world, SpawnMode spawnMode, float spawnRadius, bool simulationPaused)
+{   
+    UILabelValue("FPS:", TextFormat("%i", GetFPS()), 10, 10);
+    DrawLine(10, 45, 130, 45, LIGHTGRAY);
+
+    UILabelValue("Bodies:", TextFormat("%i", world.GetBodyCount()), 10, 75);
+
+    UIText("Mode:", 10, 95, 16, DARKBLUE);
 
     if (spawnMode == SPAWN_DYNAMIC)
     {
-        DrawText("Mode: Dynamic", 10, 60, 20, DARKGRAY);
+        UIText("Dynamic", 70, 95, 16, BLACK);
     }
     else
     {
-        DrawText("Mode: Static", 10, 60, 20, DARKGRAY);
+        UIText("Static", 70, 95, 16, BLACK);
     }
 
-    DrawText(TextFormat("Radius: %.0f", spawnRadius), 10, 85, 20, DARKGRAY);
+    UILabelValue("Radius:", TextFormat("%.0f", spawnRadius), 10, 120);
+    DrawLine(10, 160, 130, 160, LIGHTGRAY);
 
     
-    DrawText("[: Smaller   ]: Larger", 10, 145, 20, DARKGRAY);
-    DrawText("Left Click: Spawn", 10, 170, 20, DARKGRAY);
-    DrawText("Space: Jump   R: Reset", 10, 195, 20, DARKGRAY);
+    UIText("[: Smaller   ]: Larger", 10, 190, 16, DARKBLUE);
+    UIText("Left Click: Spawn", 10, 215, 16, DARKBLUE);
+    UIText("Space: Jump | R: Reset", 10, 240, 16, DARKBLUE);
+    UIText("V: Velocity Vectors", 10, 265, 16, DARKBLUE);
+    UIText("D: Remove selected", 10, 290, 16, DARKBLUE);
+    UIText("P: Pause", 10, 315, 16, DARKBLUE);
+    UIText("Period (.): Step Frame", 10, 340, 16, DARKBLUE);    
+
+    if (simulationPaused)
+    {
+        UIText("Status: PAUSED", 10, 365, 16, ORANGE);
+    }
+    else
+    {
+        UIText("Status: RUNNING", 10, 365, 16, DARKGREEN);
+    }
 }
 
 void DrawSpawnModeButtons(SpawnMode& spawnMode)
 {
-    float x = 10;
-    float y = 330;
+    float x = 670;
+    float y = 95;
     float width = 120;
-    float height = 35;
+    float height = 32;
+    float gap = 8;
 
-    bool mouseOverDynamic = IsMouseOverRect(x, y, width, height);
-    bool mouseOverStatic = IsMouseOverRect(x + width + 10, y, width, height);
+    UIText("Spawn", x, y - 35, 18, DARKBLUE);
+    DrawLine(x, y - 12, x + 120, y - 12, LIGHTGRAY);
+
+    Rectangle dynamicButton = { x, y, width, height };
+    Rectangle staticButton = { x, y + height + gap, width, height };
+
+    bool mouseOverDynamic = CheckCollisionPointRec(GetMousePosition(), dynamicButton);
+    bool mouseOverStatic = CheckCollisionPointRec(GetMousePosition(), staticButton);
 
     Color dynamicColor = LIGHTGRAY;
     Color staticColor = LIGHTGRAY;
@@ -141,17 +326,17 @@ void DrawSpawnModeButtons(SpawnMode& spawnMode)
 
     if (spawnMode == SPAWN_STATIC)
     {
-        staticColor = DARKGRAY;
+        staticColor = SKYBLUE;
     }
 
-    DrawRectangle(x, y, width, height, dynamicColor);
-    DrawRectangle(x + width + 10, y, width, height, staticColor);
+    DrawRectangleRec(dynamicButton, dynamicColor);
+    DrawRectangleRec(staticButton, staticColor);
 
-    DrawRectangleLines(x, y, width, height, DARKGRAY);
-    DrawRectangleLines(x + width + 10, y, width, height, DARKGRAY);
+    DrawRectangleLinesEx(dynamicButton, 1, DARKGRAY);
+    DrawRectangleLinesEx(staticButton, 1, DARKGRAY);
 
-    DrawText("Dynamic", x + 15, y + 8, 20, BLACK);
-    DrawText("Static", x + width + 35, y + 8, 20, BLACK);
+    UIText("Dynamic", x + 32, y + 9, 18, BLACK);
+    UIText("Static", x + 45, y + height + gap + 9, 18, BLACK);
 
     if (mouseOverDynamic && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
@@ -164,6 +349,54 @@ void DrawSpawnModeButtons(SpawnMode& spawnMode)
     }
 }
 
+void DrawSelectedBodyPanel(PhysicsWorld& world, int selectedBodyIndex)
+{
+    float x = 670;
+    float y = 185;
+
+    UIText("Selected", x, y, 18, DARKBLUE);
+    DrawLine(x, y + 24, x + 120, y + 24, LIGHTGRAY);
+
+    if (selectedBodyIndex < 0 || selectedBodyIndex >= world.GetBodyCount())
+    {
+        UIText("None", x, y + 45, 16, BLACK);
+        return;
+    }
+
+    RigidBody& body = world.GetBody(selectedBodyIndex);
+
+    UIText(TextFormat("Index: %i", selectedBodyIndex), x, y + 45, 14, DARKGRAY);
+
+    if (body.isStatic)
+    {
+        UIText("Type: Static", x, y + 68, 14, BLACK);
+    }
+    else
+    {
+        UIText("Type: Dynamic", x, y + 68, 14, BLACK);
+    }
+
+    UIText(TextFormat("Mass: %.2f   Radius: %.0f", body.mass, body.radius), x, y + 91, 14, BLACK);
+    
+    UIText(
+        TextFormat("Pos: (%.0f, %.0f)",
+                body.position.x,
+                body.position.y),
+        x,
+        y + 127,
+        14,
+        BLACK);
+
+    UIText(
+        TextFormat("Vel: (%.1f, %.1f)",
+                body.velocity.x,
+                body.velocity.y),
+        x,
+        y + 150,
+        14,
+        BLACK);
+}
+
 void DrawMassSlider(PhysicsWorld& world)
 {
     if (world.GetBodyCount() == 0)
@@ -173,10 +406,10 @@ void DrawMassSlider(PhysicsWorld& world)
 
     RigidBody& player = world.GetBody(0);
 
-    float sliderX = 10;
-    float sliderY = 275;
-    float sliderWidth = 200;
-    float sliderHeight = 8;
+    float sliderX = 670;
+    float sliderY = 35;
+    float sliderWidth = 120;
+    float sliderHeight = 6;
 
     float minMass = 0.5f;
     float maxMass = 10.0f;
@@ -209,18 +442,18 @@ void DrawMassSlider(PhysicsWorld& world)
     float t = (player.mass - minMass) / (maxMass - minMass);
     float knobX = sliderX + t * sliderWidth;
 
-    DrawText(TextFormat("Player Mass: %.2f", player.mass), 10, sliderY - 30, 20, DARKGRAY);
+    UIText(TextFormat("Mass: %.2f", player.mass), 670, sliderY - 30, 18, DARKBLUE);
 
     DrawRectangle(sliderX, sliderY, sliderWidth, sliderHeight, LIGHTGRAY);
-    DrawCircle(knobX, sliderY + sliderHeight / 2, 8, DARKGRAY);
+    DrawCircle(knobX, sliderY + sliderHeight / 2, 7, DARKGRAY);
 }
 
 bool IsMouseOverMassSlider()
 {
-    float sliderX = 10;
-    float sliderY = 275;
-    float sliderWidth = 200;
-    float sliderHeight = 8;
+    float sliderX = 670;
+    float sliderY = 35;
+    float sliderWidth = 120;
+    float sliderHeight = 6;
 
     Vector2 mouse = GetMousePosition();
 
@@ -272,6 +505,7 @@ int main()
     int screenHeight = 600;
 
     InitWindow(screenWidth, screenHeight, "Physics Engine");
+    uiFont = LoadFontEx("resources/fonts/InterVariable.ttf", 24, nullptr, 0);
     InitMenuFluidParticles();
 
     PhysicsWorld world;
@@ -295,6 +529,17 @@ int main()
 
     SpawnMode spawnMode = SPAWN_DYNAMIC;
     float spawnRadius = 20.0f;
+    bool isAimingSpawn = false;
+    Vector2 spawnStart = {0, 0};
+    Vector2 spawnCurrent = {0, 0};
+    int selectedBodyIndex = -1;
+    bool showVelocityVectors = false;
+
+    bool simulationPaused = false;
+
+    int draggedBodyIndex = -1;
+    Vector2 dragOffset = {0, 0};
+    Vector2 previousMousePosition = {0, 0};
 
     while (!WindowShouldClose())
     {
@@ -306,8 +551,8 @@ int main()
     {
         ClearBackground({245, 247, 250, 255});
 
-        DrawText("PHYSICS SANDBOX", 190, 55, 44, BLACK);
-        DrawText("Choose a simulation to begin", 255, 110, 20, GRAY);
+        UIText("PHYSICS SANDBOX", 225, 55, 44, BLACK);
+        UIText("Choose a simulation to begin", 280, 110, 20, GRAY);
 
         Rectangle collisionButton = { 40, 170, 220, 320 };
         Rectangle orbitalButton   = { 290, 170, 220, 320 };
@@ -342,8 +587,8 @@ int main()
         // Collision Card
         //========================
 
-        DrawText("RIGID BODY", 65, 205, 24, BLUE);
-        DrawText("COLLISION SIM", 65, 235, 24, BLUE);
+        UIText("RIGID BODY", 65, 205, 24, BLUE);
+        UIText("COLLISION SIM", 65, 235, 24, BLUE);
 
         DrawCircle(105, 350, 28, BLUE);
         DrawCircle(195, 350, 28, RED);
@@ -366,7 +611,7 @@ int main()
         // Orbital Card
         //========================
 
-        DrawText("ORBITAL SIM", 315, 220, 24, GREEN);
+        UIText("ORBITAL SIM", 315, 220, 24, GREEN);
 
         DrawCircle(400, 365, 30, YELLOW);
 
@@ -380,7 +625,7 @@ int main()
         // Fluid Card
         //========================
 
-        DrawText("FLUID SIM", 565, 220, 24, SKYBLUE);
+        UIText("FLUID SIM", 565, 220, 24, SKYBLUE);
 
         Rectangle cube = { 620, 400, 35, 35 };
 
@@ -397,7 +642,7 @@ int main()
             DrawCircleV(particle, 2, BLUE);
         }
 
-        DrawText("Use mouse to select", 285, 540, 22, GRAY);
+        UIText("Use mouse to select", 315, 540, 22, GRAY);
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
@@ -417,7 +662,7 @@ int main()
             }
         }
     }
-
+        //Collision Sim Run
         else if (currentState == AppState::CollisionSim)
         {
             ClearBackground(RAYWHITE);
@@ -452,34 +697,155 @@ int main()
                 }
             }
 
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseOverUI())
+            if (IsKeyPressed(KEY_V))
             {
-                SpawnBodyAtMouse(world, spawnMode, spawnRadius);
+                showVelocityVectors = !showVelocityVectors;
             }
 
+            if (IsKeyPressed(KEY_D) && selectedBodyIndex != -1)
+            {
+                world.RemoveBody(selectedBodyIndex);
+                selectedBodyIndex = -1;
+                draggedBodyIndex = -1;
+            }
+
+            if (IsKeyPressed(KEY_P))
+            {
+                simulationPaused = !simulationPaused;
+            }
+
+            if (simulationPaused && IsKeyPressed(KEY_PERIOD))
+            {
+                world.Step(fixedDt);
+            }
+
+
+            Vector2 mouse = GetMousePosition();
+
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseOverUI())
+            {
+                int clickedBodyIndex = GetBodyIndexAtMouse(world);
+
+                if (clickedBodyIndex != -1)
+                {
+                    selectedBodyIndex = clickedBodyIndex;
+                    draggedBodyIndex = clickedBodyIndex;
+
+                    RigidBody& body = world.GetBody(clickedBodyIndex);
+
+                    dragOffset.x = body.position.x - mouse.x;
+                    dragOffset.y = body.position.y - mouse.y;
+
+                    previousMousePosition = mouse;
+                }
+                else
+                {
+                    isAimingSpawn = true;
+                    spawnStart = mouse;
+                    spawnCurrent = mouse;
+                }
+            }
+
+            if (draggedBodyIndex != -1)
+            {
+                RigidBody& body = world.GetBody(draggedBodyIndex);
+
+                if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+                {
+                    Vector2 currentMouse = GetMousePosition();
+
+                    body.position.x = currentMouse.x + dragOffset.x;
+                    body.position.y = currentMouse.y + dragOffset.y;
+
+                    body.velocity.x = (currentMouse.x - previousMousePosition.x) / frameTime;
+                    body.velocity.y = (currentMouse.y - previousMousePosition.y) / frameTime;
+
+                    previousMousePosition = currentMouse;
+                }
+
+                if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                {
+                    draggedBodyIndex = -1;
+                }
+
+            }
+
+            if (isAimingSpawn && IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+                {
+                    spawnCurrent = GetMousePosition();
+                }
+
+                if (isAimingSpawn && IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                {
+                    float dx = spawnStart.x - spawnCurrent.x;
+                    float dy = spawnStart.y - spawnCurrent.y;
+                    float dragDistance = sqrt(dx * dx + dy * dy);
+
+                    if (dragDistance < 8.0f)
+                    {
+                        SpawnBodyAtMouse(world, spawnMode, spawnRadius);
+                    }
+                    else
+                    {
+                        float launchStrength = 3.0f;
+
+                        Vector2 launchVelocity = {
+                            dx * launchStrength,
+                            dy * launchStrength
+                        };
+
+                        SpawnBodyWithVelocity(world, spawnMode, spawnRadius, spawnStart, launchVelocity);
+                    }
+
+                    selectedBodyIndex = world.GetBodyCount() - 1;
+                    isAimingSpawn = false;
+                }
+            
             if (IsKeyPressed(KEY_R))
             {
                 world.Reset();
+                selectedBodyIndex = -1;
+                draggedBodyIndex = -1;
             }
 
             if (IsKeyPressed(KEY_BACKSPACE))
             {
                 currentState = AppState::MainMenu;
+                draggedBodyIndex= -1;
             }
 
             while (accumulator >= fixedDt)
             {
-                world.Step(fixedDt);
+                if (!simulationPaused)
+                {
+                    world.Step(fixedDt);
+                }
+
                 accumulator -= fixedDt;
             }
 
+            
             world.Draw();
-            DrawDebugOverlay(world, spawnMode, spawnRadius);
+
+            if (showVelocityVectors)
+            {
+                DrawVelocityVectors(world);
+            }
+
+            DrawSelectedBodyOutline(world, selectedBodyIndex);
+            
+            if (isAimingSpawn)
+            {
+                DrawSpawnTrajectoryPreview(spawnStart, spawnCurrent, spawnRadius);
+            }
+
+            DrawUIOverlay(world, spawnMode, spawnRadius, simulationPaused);
             DrawMassSlider(world);
             DrawSpawnModeButtons(spawnMode);
-            DrawText("BACKSPACE: Menu", 20, 560, 20, GRAY);
+            DrawSelectedBodyPanel(world, selectedBodyIndex);
+            UIText("BACKSPACE: Menu", 10, 585, 16, DARKGRAY);
         }
-
+        //Orbital Sim run
         else if (currentState == AppState::OrbitalSim)
         {
             orbitalWorld.Update(frameTime);
@@ -495,7 +861,7 @@ int main()
                 currentState = AppState::MainMenu;
             }
         }
-
+        //Fluid Sim run
         else if (currentState == AppState::FluidSim)
         {
             fluidWorld.Update(frameTime);
@@ -514,7 +880,7 @@ int main()
 
         EndDrawing();
     }
-
+    UnloadFont(uiFont);
     CloseWindow();
 
     return 0;

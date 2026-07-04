@@ -14,7 +14,7 @@ void PhysicsWorld::Step(float dt)
         UpdateVelocity(body, dt);
         ApplyDrag(body);
         UpdatePosition(body, dt);
-        CheckRigidBodyScreenCollision(body, screenWidth, screenHeight);
+        CheckArenaCollision(body);
     }
 
     for (int i = 0; i < bodies.size(); i++)
@@ -36,8 +36,27 @@ void PhysicsWorld::AddBody(const RigidBody& body)
     bodies.push_back(body);
 }
 
-void PhysicsWorld::Draw() const
+void PhysicsWorld::RemoveBody(int index)
 {
+    if (index < 0 || index >= bodies.size())
+    {
+        return;
+    }
+
+    bodies.erase(bodies.begin() + index);
+}
+
+void PhysicsWorld::Draw() const
+{   
+    DrawRectangleRec(arena, Color{235, 235, 235, 255});
+    DrawRectangleLinesEx(arena, 2.0f, LIGHTGRAY);
+    DrawRectangleLinesEx(
+        {arena.x + 3, arena.y + 3,
+        arena.width - 6, arena.height - 6},
+        1,
+        Fade(GRAY, 0.35f)
+    );
+
     for (int i = 0; i < bodies.size(); i++)
     {
         if (bodies[i].isStatic)
@@ -62,17 +81,56 @@ RigidBody& PhysicsWorld::GetBody(int index)
 }
 
 int PhysicsWorld::GetBodyCount() const
-
 {
     return bodies.size();
 }
+
 void PhysicsWorld::Reset()
 {
     bodies.clear();
 
-    RigidBody player = CreateRigidBody(400, 300, 30, 1);
+    arena = {170, 70, 495, 430};
+
+    float startX = arena.x + arena.width / 2.0f;
+    float startY = arena.y + arena.height / 2.0f;
+
+    RigidBody player = CreateRigidBody(startX, startY, 30, 1);
+
     player.velocity.x = 100;
     player.restitution = 0.9f;
 
     AddBody(player);
+}
+
+
+void PhysicsWorld::CheckArenaCollision(RigidBody& body)
+{
+    if (body.position.x - body.radius < arena.x)
+    {
+        body.position.x = arena.x + body.radius;
+        body.velocity.x *= -body.restitution;
+    }
+
+    if (body.position.x + body.radius > arena.x + arena.width)
+    {
+        body.position.x = arena.x + arena.width - body.radius;
+        body.velocity.x *= -body.restitution;
+    }
+
+    if (body.position.y - body.radius < arena.y)
+    {
+        body.position.y = arena.y + body.radius;
+        body.velocity.y *= -body.restitution;
+    }
+
+    if (body.position.y + body.radius > arena.y + arena.height)
+    {
+        body.position.y = arena.y + arena.height - body.radius;
+        body.velocity.y *= -body.restitution;
+        body.isOnGround = true;
+    }
+    else
+    {
+        body.isOnGround = false;
+    }
 }
