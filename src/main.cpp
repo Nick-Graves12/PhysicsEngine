@@ -46,9 +46,15 @@ bool IsMouseOverRect(float x, float y, float width, float height)
 bool IsMouseOverMassSlider();
 bool IsMouseOverUI()
 {
+    float buttonX = 670;
+    float buttonY = 95;
+    float buttonWidth = 120;
+    float buttonHeight = 32;
+    float buttonGap = 8;
+
     return IsMouseOverMassSlider() ||
-           IsMouseOverRect(650, 335, 120, 32) ||
-           IsMouseOverRect(650, 355 + 32 , 120, 32);
+           IsMouseOverRect(buttonX, buttonY, buttonWidth, buttonHeight) ||
+           IsMouseOverRect(buttonX, buttonY + buttonHeight + buttonGap, buttonWidth, buttonHeight);
 }
 
 

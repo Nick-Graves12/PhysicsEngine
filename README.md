@@ -55,6 +55,10 @@ Future simulations planned include:
 ![Main Menu](screenshots/menu.png)
 
 
+## Collision Sandbox
+
+![Collision Sandbox](screenshots/collision-sim-demo.gif)
+
 ## How to Build
 
 ```bash
