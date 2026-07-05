@@ -54,9 +54,6 @@ Future simulations planned include:
 
 ![Main Menu](screenshots/menu.png)
 
-## Demo
-
-![Collision Sandbox](screenshots/collision-sim-demo.gif)
 
 ## How to Build
 
