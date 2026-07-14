@@ -82,4 +82,4 @@ make
 
 ## Author
 
-Nick Graves
+Nicholas Graves
