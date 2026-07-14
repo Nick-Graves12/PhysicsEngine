@@ -16,6 +16,16 @@ struct OrbitalBody
     int parentIndex = -1;
 
     std::vector<Vector2> trail;
+    
+    Vector2 trailStart;
+    bool hasMovedAwayFromTrailStart = false;
+    bool hasCompletedFirstOrbit = false;
+};
+struct Star
+{   
+    Vector2 position;
+    float radius;
+    Color color;
 };
 
 class OrbitalWorld
@@ -32,6 +42,8 @@ public:
 private:
     OrbitalBody sun;
     std::vector<OrbitalBody> planets;
+    std::vector<Star> stars;
+
 
     bool isDragging = false;
     Vector2 dragStart;
@@ -44,6 +56,8 @@ private:
     void DrawBodies();
     void DrawDragPreview();
     void DrawUI();
+    void GenerateStars();
+    void DrawStars();
 
 
     Vector2 CalculateLaunchVelocity() const;
@@ -58,8 +72,16 @@ private:
     void SelectPlanetAtMouse();
     void DrawSelectedPlanetInfo();
     void SpawnMoon();
+
+    bool showVelocityVectors = false;
+    void DrawVelocityVectors();
+    bool showTrails = true;
+    bool simulationPaused = false;
+    bool usePlanetGravity = true;
+    float timeScale = 1.0f;
+    void DrawOrbitPrediction();
     
-
-
-
 };
+
+
+

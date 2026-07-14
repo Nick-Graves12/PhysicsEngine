@@ -7,20 +7,9 @@
 #include "Physics.h"
 #include "OrbitalWorld.h"
 #include "FluidWorld.h"
+#include "UI.h"
 
-Font uiFont;
 
-void UIText(const char* text, float x, float y, float size, Color color)
-{
-    DrawTextEx(
-        uiFont,
-        text,
-        { x, y },
-        size,
-        1.0f,
-        color
-    );
-}
 enum class AppState
 {
     MainMenu,
@@ -256,13 +245,6 @@ void HandlePlayerInput(PhysicsWorld& world, float dt)
         ApplyImpulse(player, Vector2D{0.0f, -jumpImpulse * player.mass});
         player.isOnGround = false;
     }
-}
-
-void UILabelValue(const char* label, const char* value,
-                  float x, float y)
-{
-    UIText(label, x, y, 16, DARKBLUE);
-    UIText(value, x + 60, y, 16, BLACK);
 }
 
 void DrawUIOverlay(const PhysicsWorld& world, SpawnMode spawnMode, float spawnRadius, bool simulationPaused)
@@ -506,9 +488,13 @@ void InitMenuFluidParticles()
 int main()
 {
     AppState currentState = AppState::MainMenu;
-
     int screenWidth = 800;
     int screenHeight = 600;
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(screenWidth, screenHeight, "Physics Engine");
+    screenWidth = GetScreenWidth();
+    screenHeight = GetScreenHeight();
 
     InitWindow(screenWidth, screenHeight, "Physics Engine");
     uiFont = LoadFontEx("resources/fonts/InterVariable.ttf", 24, nullptr, 0);

@@ -52,7 +52,7 @@ Future simulations planned include:
 ## Screenshots
 -Main Menu
 
-![Main Menu](screenshots/menu.png)
+![Main Menu](screenshots/menu-v1.png)
 
 
 ## Collision Sandbox
