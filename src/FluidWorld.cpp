@@ -358,10 +358,14 @@ void FluidWorld::Draw()
         GRAY
     );
 
+    UIText("Hold left-click: Stir fluid", 20, 50, 20, GRAY);
+
     DrawFPS(
         20,
-        50
+        80
     );
+
+
 
     UIText(
         "BACKSPACE: Menu",
@@ -374,10 +378,67 @@ void FluidWorld::Draw()
 
 void FluidWorld::HandleInput()
 {
-   /*  if (inputDelay > 0.0f)
+    // Stir only while holding the left mouse button.
+    if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT))
     {
         return;
-    } */
+    }
+
+    Vector2 mousePosition = GetMousePosition();
+
+    // Do nothing if the mouse is outside the tank.
+    if (!CheckCollisionPointRec(mousePosition, tank))
+    {
+        return;
+    }
+
+    Vector2 mouseMovement = GetMouseDelta();
+
+    // Prevent an unusually large mouse jump from exploding the fluid.
+    mouseMovement.x =
+        std::clamp(mouseMovement.x, -35.0f, 35.0f);
+
+    mouseMovement.y =
+        std::clamp(mouseMovement.y, -35.0f, 35.0f);
+
+    const float stirringRadius = 55.0f;
+    const float stirringRadiusSquared =
+        stirringRadius * stirringRadius;
+
+    const float stirringStrength = 8.0f;
+
+    for (FluidParticle& particle : particles)
+    {
+        float dx =
+            particle.position.x - mousePosition.x;
+
+        float dy =
+            particle.position.y - mousePosition.y;
+
+        float distanceSquared =
+            dx * dx + dy * dy;
+
+        // Ignore particles outside the stirring radius.
+        if (distanceSquared >= stirringRadiusSquared)
+        {
+            continue;
+        }
+
+        float distance = sqrt(distanceSquared);
+
+        float closeness =
+            1.0f - distance / stirringRadius;
+
+        particle.velocity.x +=
+            mouseMovement.x *
+            stirringStrength *
+            closeness;
+
+        particle.velocity.y +=
+            mouseMovement.y *
+            stirringStrength *
+            closeness;
+    }
 }
 
 void FluidWorld::SpawnParticle(Vector2 position)

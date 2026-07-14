@@ -59,6 +59,17 @@ Future simulations planned include:
 
 ![Collision Sandbox](screenshots/collision-sim-demo.gif)
 
+
+## Ortbital Sandbox
+
+![Orbital Sandbox](screenshots/orbital-sim-demo.gif)
+
+
+## Fluid Sandbox
+
+![Fluid Sandbox](screenshots/fluid-sim-demo.gif)
+
+
 ## How to Build
 
 ```bash
