@@ -52,6 +52,12 @@ This project is being developed as a long-term learning project to explore:
 - Interactive UI
 - Software architecture
 
+## Future Additions
+
+- Wind/Aerodynamics simulation (In progress)
+- Soft Body/Spring simulation
+- Double pendulum simulation
+
 
 ## Screenshots
 -Main Menu

@@ -8,6 +8,7 @@
 #include "OrbitalWorld.h"
 #include "FluidWorld.h"
 #include "UI.h"
+#include "WindWorld.h"
 
 
 enum class AppState
@@ -15,7 +16,8 @@ enum class AppState
     MainMenu,
     CollisionSim, 
     OrbitalSim, 
-    FluidSim
+    FluidSim,
+    WindSim
 };
 
 void DrawRigidBody(const RigidBody& body, Color color)
@@ -488,15 +490,14 @@ void InitMenuFluidParticles()
 int main()
 {
     AppState currentState = AppState::MainMenu;
-    int screenWidth = 800;
+    int screenWidth = 1050;
     int screenHeight = 600;
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "Physics Engine");
     screenWidth = GetScreenWidth();
     screenHeight = GetScreenHeight();
-
-    InitWindow(screenWidth, screenHeight, "Physics Engine");
+    
     uiFont = LoadFontEx("resources/fonts/InterVariable.ttf", 24, nullptr, 0);
     InitMenuFluidParticles();
 
@@ -515,6 +516,11 @@ int main()
     fluidWorld.screenWidth = screenWidth;
     fluidWorld.screenHeight = screenHeight;
     fluidWorld.Reset();
+
+    WindWorld windWorld;
+    windWorld.screenWidth = screenWidth;
+    windWorld.screenHeight = screenHeight;
+    windWorld.Reset();
 
     const float fixedDt = 1.0f / 60.0f;
     float accumulator = 0.0f;
@@ -543,12 +549,13 @@ int main()
     {
         ClearBackground({245, 247, 250, 255});
 
-        UIText("PHYSICS SANDBOX", 225, 55, 44, BLACK);
-        UIText("Choose a simulation to begin", 280, 110, 20, GRAY);
+        UIText("PHYSICS SANDBOX", 360, 55, 44, BLACK);
+        UIText("Choose a simulation to begin", 410, 110, 20, GRAY);
 
         Rectangle collisionButton = { 40, 170, 220, 320 };
         Rectangle orbitalButton   = { 290, 170, 220, 320 };
         Rectangle fluidButton     = { 540, 170, 220, 320 };
+        Rectangle windButton      = {790, 170, 220, 320};
 
         Vector2 mouse = GetMousePosition();
 
@@ -567,13 +574,20 @@ int main()
             ? Fade(SKYBLUE, 0.08f)
             : WHITE;
 
+        Color windFill =
+            CheckCollisionPointRec(mouse, windButton)
+            ? Fade(RED, 0.08f)
+            : WHITE;
+
         DrawRectangleRounded(collisionButton, 0.04f, 12, collisionFill);
         DrawRectangleRounded(orbitalButton, 0.04f, 12, orbitalFill);
         DrawRectangleRounded(fluidButton, 0.04f, 12, fluidFill);
+        DrawRectangleRounded(windButton, 0.04f, 12, windFill);
 
         DrawRectangleRoundedLines(collisionButton, 0.04f, 12, BLUE);
         DrawRectangleRoundedLines(orbitalButton, 0.04f, 12, GREEN);
         DrawRectangleRoundedLines(fluidButton, 0.04f, 12, SKYBLUE);
+        DrawRectangleRoundedLines(windButton, 0.04f, 12, RED);
 
         //========================
         // Collision Card
@@ -634,7 +648,15 @@ int main()
             DrawCircleV(particle, 2, BLUE);
         }
 
-        UIText("Use mouse to select", 315, 540, 22, GRAY);
+        //========================
+        // Wind Card
+        //========================
+
+        UIText("WIND SIM", 815, 220, 24, RED);
+
+
+
+        UIText("Use mouse to select", 430, 540, 22, GRAY);
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
@@ -652,6 +674,12 @@ int main()
             {
                 currentState = AppState::FluidSim;
             }
+
+            if (CheckCollisionPointRec(mouse, windButton))
+            {
+                currentState = AppState::WindSim;
+            }
+
         }
     }
         //Collision Sim Run
@@ -862,6 +890,22 @@ int main()
             if (IsKeyPressed(KEY_R))
             {
                 fluidWorld.Reset();
+            }
+
+            if (IsKeyPressed(KEY_BACKSPACE))
+            {
+                currentState = AppState::MainMenu;
+            }
+        }
+        //Wind Sim run
+        else if (currentState == AppState::WindSim)
+        {
+            windWorld.Update(frameTime);
+            windWorld.Draw();
+            
+            if (IsKeyPressed(KEY_R))
+            {
+                windWorld.Reset();
             }
 
             if (IsKeyPressed(KEY_BACKSPACE))

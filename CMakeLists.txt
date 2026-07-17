@@ -15,6 +15,7 @@ add_executable(PhysicsEngine src/main.cpp
                 src/OrbitalWorld.cpp
                 src/FluidWorld.cpp
                 src/UI.cpp
+                src/WindWorld.cpp
 )
 
 target_link_libraries(PhysicsEngine PRIVATE raylib)
