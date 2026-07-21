@@ -497,7 +497,7 @@ int main()
     InitWindow(screenWidth, screenHeight, "Physics Engine");
     screenWidth = GetScreenWidth();
     screenHeight = GetScreenHeight();
-    
+
     uiFont = LoadFontEx("resources/fonts/InterVariable.ttf", 24, nullptr, 0);
     InitMenuFluidParticles();
 
@@ -654,6 +654,86 @@ int main()
 
         UIText("WIND SIM", 815, 220, 24, RED);
 
+        Vector2 windObstacle = { 900.0f, 385.0f };
+        float windObstacleRadius = 24.0f;
+
+        // Streamlines above and below the obstacle.
+        float streamlineY[] =
+        {
+            300.0f,
+            322.0f,
+            344.0f,
+            366.0f,
+            404.0f,
+            426.0f,
+            448.0f,
+            470.0f
+        };
+
+        for (float baseY : streamlineY)
+        {
+            Vector2 previousPoint = { 805.0f, baseY };
+
+            for (int pointIndex = 1; pointIndex <= 24; pointIndex++)
+            {
+                float x = 805.0f + pointIndex * 8.0f;
+
+                float dx = x - windObstacle.x;
+                float verticalDistance = fabs(baseY - windObstacle.y);
+
+                // Strongest bend near the obstacle and weaker farther away.
+                float horizontalInfluence =
+                    expf(-(dx * dx) / 1800.0f);
+
+                float verticalInfluence =
+                    std::clamp(
+                        (75.0f - verticalDistance) / 75.0f,
+                        0.0f,
+                        1.0f
+                    );
+
+                float bendDirection =
+                    baseY < windObstacle.y ? -1.0f : 1.0f;
+
+                float bend =
+                    bendDirection *
+                    horizontalInfluence *
+                    verticalInfluence *
+                    35.0f;
+
+                Vector2 currentPoint =
+                {
+                    x,
+                    baseY + bend
+                };
+
+                DrawLineEx(
+                    previousPoint,
+                    currentPoint,
+                    1.5f,
+                    SKYBLUE
+                );
+
+                previousPoint = currentPoint;
+            }
+
+            // Arrowhead at the right side of each streamline.
+            float arrowX = 997.0f;
+
+            DrawTriangle(
+                { arrowX, baseY },
+                { arrowX - 7.0f, baseY - 4.0f },
+                { arrowX - 7.0f, baseY + 4.0f },
+                SKYBLUE
+            );
+        }
+
+        // Circular wind-tunnel obstacle.
+        DrawCircleV(
+            windObstacle,
+            windObstacleRadius,
+            RED
+        );
 
 
         UIText("Use mouse to select", 430, 540, 22, GRAY);
