@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "UI.h"
 #include <algorithm>
+#include "raymath.h"
 
 void WindWorld::Reset()
 {
@@ -45,202 +46,183 @@ void WindWorld::Reset()
 void WindWorld::Update(float dt)
 {
     HandleInput();
+    CalculateLift();
+    CalculateDrag();
     UpdateParticles(dt);
 }
 
-void WindWorld::Draw()
+
+//Geometry Helpers
+//------------
+Vector2 WindWorld::RotatePoint(Vector2 point, float angleRadians)
 {
-    ClearBackground(Color{ 225, 235, 245, 255});
+    float cosine = cosf(angleRadians);
+    float sine = sinf(angleRadians);
 
-    DrawRectangleLinesEx(tunnel, 8.0f, LIGHTGRAY);
-
-    for (const WindParticle& particle : particles)
+    return
     {
-        float speed = sqrt(
-            particle.velocity.x * particle.velocity.x +
-            particle.velocity.y * particle.velocity.y
-        );
-
-        float windSpeed = sqrt(
-            velocity.x * velocity.x +
-            velocity.y * velocity.y
-        );
-
-        float minDisplaySpeed = windSpeed * 0.97f;
-        float maxDisplaySpeed = windSpeed * 1.03f;
-
-        float speedAmount = (speed - minDisplaySpeed) / 
-                            (maxDisplaySpeed - minDisplaySpeed);
-
-        speedAmount = std::clamp(speedAmount, 0.0f, 1.0f);
-
-        Color particleColor;
-
-        if (speedAmount < 0.5f)
-        {
-            float t = speedAmount / 0.5f;
-            particleColor = ColorLerp(BLUE, GREEN, t);
-        }
-        else
-        {
-            float t = (speedAmount - 0.5f) / 0.5f;
-            particleColor = ColorLerp(GREEN, RED, t);
-        }
-
-        for (size_t i = 1; i < particle.trail.size(); i++)
-        {
-            float alpha =
-                static_cast<float>(i) /
-                static_cast<float>(particle.trail.size());
-
-            DrawLineEx(
-                particle.trail[i - 1],
-                particle.trail[i],
-                1.0f,
-                Fade(particleColor, alpha)
-            );
-        }
-
-        DrawCircleV(
-            particle.position,
-            particle.radius,
-            particleColor
-        );
-    }
-
-    switch (selectedShape)
-    {
-    case ObstacleShape::Circle:
-    {
-        DrawCircleV(
-            obstaclePosition,
-            obstacleHalfSize,
-            obstacleColor
-        );
-        break;
-    }
-
-    case ObstacleShape::Square:
-    {
-        DrawRectanglePro(
-            {
-                obstaclePosition.x,
-                obstaclePosition.y,
-                obstacleHalfSize * 2.0f,
-                obstacleHalfSize * 2.0f
-            },
-            {
-                obstacleHalfSize,
-                obstacleHalfSize
-            },
-            0.0f,
-            obstacleColor
-        );
-        break;
-    }
-
-    case ObstacleShape::Diamond:
-    {
-        DrawRectanglePro(
-            {
-                obstaclePosition.x,
-                obstaclePosition.y,
-                obstacleHalfSize * 2.0f,
-                obstacleHalfSize * 2.0f
-            },
-            {
-                obstacleHalfSize,
-                obstacleHalfSize
-            },
-            45.0f,
-            obstacleColor
-        );
-        break;
-    }
-
-    case ObstacleShape::Airfoil:
-    {
-        const int segmentCount = 32;
-
-        float chord = obstacleHalfSize * 3.0f;
-        float thicknessRatio = 0.12f;
-
-        float leadingEdgeX = obstaclePosition.x - chord * 0.5f;
-
-        for (int i = 0; i < segmentCount; i++)
-        {
-            float x1 = static_cast<float>(i) /
-                    static_cast<float>(segmentCount);
-
-            float x2 = static_cast<float>(i + 1) /
-                    static_cast<float>(segmentCount);
-
-            float thickness1 =
-                5.0f * thicknessRatio * chord *
-                (
-                    0.2969f * sqrtf(x1) -
-                    0.1260f * x1 -
-                    0.3516f * x1 * x1 +
-                    0.2843f * x1 * x1 * x1 -
-                    0.1036f * x1 * x1 * x1 * x1
-                );
-
-            float thickness2 =
-                5.0f * thicknessRatio * chord *
-                (
-                    0.2969f * sqrtf(x2) -
-                    0.1260f * x2 -
-                    0.3516f * x2 * x2 +
-                    0.2843f * x2 * x2 * x2 -
-                    0.1036f * x2 * x2 * x2 * x2
-                );
-
-            Vector2 upperLeft =
-            {
-                leadingEdgeX + x1 * chord,
-                obstaclePosition.y - thickness1
-            };
-
-            Vector2 upperRight =
-            {
-                leadingEdgeX + x2 * chord,
-                obstaclePosition.y - thickness2
-            };
-
-            Vector2 lowerLeft =
-            {
-                leadingEdgeX + x1 * chord,
-                obstaclePosition.y + thickness1
-            };
-
-            Vector2 lowerRight =
-            {
-                leadingEdgeX + x2 * chord,
-                obstaclePosition.y + thickness2
-            };
-
-            DrawTriangle(
-                upperLeft,
-                lowerLeft,
-                upperRight,
-                obstacleColor
-            );
-
-            DrawTriangle(
-                upperRight,
-                lowerLeft,
-                lowerRight,
-                obstacleColor
-            );
-        }
-
-        break;
-    }
-    }
-
-    DrawUI();
+        point.x * cosine - point.y * sine,
+        point.x * sine + point.y * cosine
+    };
 }
 
+Vector2 WindWorld::AirfoilLocalToWorld(Vector2 localPoint, Vector2 airfoilCenter, float angleRadians)
+{
+    Vector2 rotatedPoint =
+        RotatePoint(localPoint, angleRadians);
+
+    return
+    {
+        airfoilCenter.x + rotatedPoint.x,
+        airfoilCenter.y + rotatedPoint.y
+    };
+}
+
+Vector2 WindWorld::AirfoilWorldToLocal(Vector2 worldPoint, Vector2 airfoilCenter, float angleRadians)
+{
+    Vector2 relativePoint =
+    {
+        worldPoint.x - airfoilCenter.x,
+        worldPoint.y - airfoilCenter.y
+    };
+
+    return RotatePoint(relativePoint, -angleRadians);
+}
+
+//Input
+//------------
+void WindWorld::HandleInput()
+{
+    Vector2 mousePosition = GetMousePosition();
+
+    Rectangle sliderHitbox = {
+        particleCountSlider.x,
+        particleCountSlider.y - 8.0f,
+        particleCountSlider.width,
+        particleCountSlider.height + 16.0f
+    };
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        CheckCollisionPointRec(mousePosition, sliderHitbox))
+    {
+        float mouseAmount =
+            (mousePosition.x - particleCountSlider.x) /
+            particleCountSlider.width;
+
+        mouseAmount = std::clamp(mouseAmount, 0.0f, 1.0f);
+
+        particleCount =
+            minParticleCount +
+            static_cast<int>(
+                mouseAmount *
+                (maxParticleCount - minParticleCount)
+            );
+    }
+
+    Rectangle windSliderHitbox = {
+        windSpeedSlider.x,
+        windSpeedSlider.y - 8.0f,
+        windSpeedSlider.width,
+        windSpeedSlider.height + 16.0f
+        };
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        CheckCollisionPointRec(mousePosition, windSliderHitbox))
+    {
+        float mouseAmount =
+            (mousePosition.x - windSpeedSlider.x) /
+            windSpeedSlider.width;
+
+        mouseAmount = std::clamp(mouseAmount, 0.0f, 1.0f);
+
+        windSpeed =
+            minWindSpeed +
+            mouseAmount * (maxWindSpeed - minWindSpeed);
+
+        velocity.x = windSpeed;
+        velocity.y = 0.0f;
+    }
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    {
+        Vector2 mousePosition = GetMousePosition();
+
+        if (CheckCollisionPointRec(
+            mousePosition,
+            speedVisualizationButton))
+        {
+            particleVisualization =
+                ParticleVisualization::Speed;
+        }
+
+        if (CheckCollisionPointRec(
+            mousePosition,
+            pressureVisualizationButton))
+        {
+            particleVisualization =
+                ParticleVisualization::Pressure;
+        }
+    }
+
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+    {
+        if (CheckCollisionPointRec(mousePosition, circleButton))
+        {
+            selectedShape = ObstacleShape::Circle;
+            Reset();
+        }
+
+        if (CheckCollisionPointRec(mousePosition, squareButton))
+        {
+            selectedShape = ObstacleShape::Square;
+            Reset();
+        }
+
+        if (CheckCollisionPointRec(mousePosition, diamondButton))
+        {
+            selectedShape = ObstacleShape::Diamond;
+            Reset();
+        }
+
+        if (CheckCollisionPointRec(mousePosition, airfoilButton))
+        {
+            selectedShape = ObstacleShape::Airfoil;
+            Reset();
+        }
+    }
+
+    if (selectedShape == ObstacleShape::Airfoil)
+    {
+        Rectangle angleOfAttackHitbox = {
+        angleSlider.x,
+        angleSlider.y - 8.0f,
+        angleSlider.width,
+        angleSlider.height + 16.0f
+        };
+
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+            CheckCollisionPointRec(mousePosition, angleOfAttackHitbox))
+        {
+
+
+            float mouseAmount =
+                (mousePosition.x - angleSlider.x) /
+                angleSlider.width;
+
+            mouseAmount = std::clamp(mouseAmount, 0.0f, 1.0f);
+
+            airfoilAngleDegrees =
+                minAngle +
+                mouseAmount *
+                (maxAngle - minAngle);
+        }
+    }  
+}
+
+
+//Particles
+//------------
 void WindWorld::SpawnParticle(Vector2 spawnPosition)
 {
     WindParticle particle;
@@ -253,54 +235,109 @@ void WindWorld::SpawnParticle(Vector2 spawnPosition)
     particles.push_back(particle);
 }
 
-void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
-{   
-    switch (selectedShape)
+void WindWorld::UpdateParticles(float dt)
+{
+    float recoveryStrength = 6.0f;
+
+    for (WindParticle& particle : particles)
     {
-        case ObstacleShape::Circle:
+        ApplyObstacleInfluence(particle, dt);
+
+        particle.position.x +=  particle.velocity.x * dt;
+        particle.position.y +=  particle.velocity.y * dt;
+
+        ResolveParticleObstacleCollision(particle);
+
+        
+        float dx = particle.position.x - obstaclePosition.x;
+        float dy = particle.position.y - obstaclePosition.y;
+        float distanceToObstacle = sqrt(dx * dx + dy * dy);
+
+        bool insideInfluence = 
+            distanceToObstacle <= obstacleInfluenceRadius;
+
+        if (!insideInfluence)
         {
-            float dx = particle.position.x - obstaclePosition.x;
-            float dy = particle.position.y - obstaclePosition.y;
-            float distance = sqrt(dx * dx + dy * dy);
-            
-            float radiusSum = particle.radius + obstacleHalfSize;
-            
+            Vector2 difference = {velocity.x - particle.velocity.x, velocity.y - particle.velocity.y};
 
-            if (distance <= radiusSum && distance > 0.0f)
-            {
-                float penetration = radiusSum - distance;
-                float normalX = dx / distance;
-                float normalY = dy / distance;
-
-                particle.position.x += normalX * penetration;
-                particle.position.y += normalY * penetration;
-
-                Vector2 tangentA = {-normalY, normalX};
-                Vector2 tangentB = {normalY, -normalX};
-                float dotA = tangentA.x * velocity.x + tangentA.y * velocity.y;
-                float dotB = tangentB.x * velocity.x + tangentB.y * velocity.y;
-                Vector2 tangent = (dotA > dotB) ? tangentA : tangentB;
-
-                float speed = sqrt(particle.velocity.x * particle.velocity.x + particle.velocity.y * particle.velocity.y);
-                
-                particle.velocity.x = tangent.x * speed;
-                particle.velocity.y = tangent.y * speed;
-            }
-
-            break;
+            particle.velocity.x += difference.x * recoveryStrength * dt;
+            particle.velocity.y += difference.y * recoveryStrength * dt;
         }
 
-        case ObstacleShape::Square:
-        {
-            float leftEdge = obstaclePosition.x - obstacleHalfSize;
-            float rightEdge = obstaclePosition.x + obstacleHalfSize;
-            float top = obstaclePosition.y - obstacleHalfSize;
-            float bottom = obstaclePosition.y + obstacleHalfSize;
+        particle.trail.push_back(particle.position);
 
-            if (particle.position.x - particle.radius >= leftEdge && 
-                particle.position.x + particle.radius<= rightEdge && 
-                particle.position.y - particle.radius >= top && 
-                particle.position.y + particle.radius <= bottom)
+        if (particle.trail.size() > 50)
+        {
+            particle.trail.erase(particle.trail.begin());
+        }
+
+        if (particle.position.x > tunnel.x + tunnel.width)
+        {   
+            particle.position.x = tunnel.x + 10.0f;
+            particle.position.y = GetRandomValue(
+                static_cast<int>(tunnel.y + 10.0f),
+                static_cast<int>(tunnel.y + tunnel.height - 10.0f)
+            );
+
+            particle.velocity = velocity;
+            particle.trail.clear();
+        }
+    }
+}
+
+
+//Collisions
+//------------
+void WindWorld::RedirectVelocityAlongSurface(WindParticle& particle, Vector2 normal)
+{
+        Vector2 tangentA = {-normal.y, normal.x};
+        Vector2 tangentB = {normal.y, -normal.x};
+        float dotA = tangentA.x * particle.velocity.x + tangentA.y * particle.velocity.y;
+        float dotB = tangentB.x * particle.velocity.x + tangentB.y * particle.velocity.y;
+        Vector2 tangent = (dotA > dotB) ? tangentA : tangentB;
+
+        float speed = sqrt(particle.velocity.x * particle.velocity.x + particle.velocity.y * particle.velocity.y);
+                
+        particle.velocity.x = tangent.x * speed;
+        particle.velocity.y = tangent.y * speed;
+}
+
+void WindWorld::ResolveCircleCollision(WindParticle& particle)
+{
+    float dx = particle.position.x - obstaclePosition.x;
+    float dy = particle.position.y - obstaclePosition.y;
+    float distance = sqrt(dx * dx + dy * dy);
+            
+    float radiusSum = particle.radius + obstacleHalfSize;
+            
+
+    if (distance <= radiusSum && distance > 0.0f)
+    {
+        float penetration = radiusSum - distance;
+        Vector2 normal = 
+        {
+            dx / distance,
+            dy / distance
+        };
+
+        particle.position.x += normal.x * penetration;
+        particle.position.y += normal.y * penetration;
+
+        RedirectVelocityAlongSurface(particle, normal);
+    }
+}
+
+void WindWorld::ResolveSquareCollision(WindParticle& particle)
+{
+    float leftEdge = obstaclePosition.x - obstacleHalfSize;
+    float rightEdge = obstaclePosition.x + obstacleHalfSize;
+    float top = obstaclePosition.y - obstacleHalfSize;
+    float bottom = obstaclePosition.y + obstacleHalfSize;
+
+    if (particle.position.x - particle.radius >= leftEdge && 
+        particle.position.x + particle.radius<= rightEdge && 
+        particle.position.y - particle.radius >= top && 
+        particle.position.y + particle.radius <= bottom)
             {
                 float distanceFromLeftEdge = (particle.position.x - particle.radius) - leftEdge;
                 float distanceFromRightEdge = rightEdge - (particle.position.x + particle.radius);
@@ -311,6 +348,7 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                     distanceFromRightEdge, 
                     distanceFromTop, 
                     distanceFromBottom});
+
                 Vector2 normal = {0.0f, 0.0f};
 
                 if (smallest == distanceFromLeftEdge)
@@ -334,48 +372,28 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                     normal = {0.0f, 1.0f};
                 }
 
-                Vector2 tangentA = { -normal.y, normal.x };
-                Vector2 tangentB = { normal.y, -normal.x };
-
-                float dotA =
-                    tangentA.x * particle.velocity.x +
-                    tangentA.y * particle.velocity.y;
-
-                float dotB =
-                    tangentB.x * particle.velocity.x +
-                    tangentB.y * particle.velocity.y;
-
-                Vector2 tangent = (dotA > dotB) ? tangentA : tangentB;
-
-                float speed = sqrt(
-                    particle.velocity.x * particle.velocity.x +
-                    particle.velocity.y * particle.velocity.y
-                );
-
-                particle.velocity.x = tangent.x * speed;
-                particle.velocity.y = tangent.y * speed;
+                RedirectVelocityAlongSurface(particle, normal);
             }
 
-            break;
-        }
+}
 
-        case ObstacleShape::Diamond:
+void WindWorld::ResolveDiamondCollision(WindParticle& particle)
+{
+    float dx = particle.position.x - obstaclePosition.x;
+    float dy = particle.position.y - obstaclePosition.y;
+
+    float diamondRadius = obstacleHalfSize * 1.41421356f;
+    const float inverseSqrtTwo = 0.70710678f;
+    const float sqrtTwo = 1.41421356f;
+
+    // Expands the diamond by the particle's radius.
+    float expandedRadius =
+        diamondRadius + particle.radius * sqrtTwo;
+
+    float diamondDistance = fabs(dx) + fabs(dy);
+
+    if (diamondDistance <= expandedRadius)
         {
-            float dx = particle.position.x - obstaclePosition.x;
-            float dy = particle.position.y - obstaclePosition.y;
-
-            float diamondRadius = obstacleHalfSize * 1.41421356f;
-            const float inverseSqrtTwo = 0.70710678f;
-            const float sqrtTwo = 1.41421356f;
-
-            // Expands the diamond by the particle's radius.
-            float expandedRadius =
-                diamondRadius + particle.radius * sqrtTwo;
-
-            float diamondDistance = fabs(dx) + fabs(dy);
-
-            if (diamondDistance <= expandedRadius)
-            {
                 Vector2 normal = { 0.0f, 0.0f };
 
                 // Choose the face based on the particle's quadrant.
@@ -406,39 +424,18 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                 particle.position.x += normal.x * penetration;
                 particle.position.y += normal.y * penetration;
 
-                Vector2 tangentA = { -normal.y, normal.x };
-                Vector2 tangentB = { normal.y, -normal.x };
-
-                float dotA =
-                    tangentA.x * particle.velocity.x +
-                    tangentA.y * particle.velocity.y;
-
-                float dotB =
-                    tangentB.x * particle.velocity.x +
-                    tangentB.y * particle.velocity.y;
-
-                Vector2 tangent = (dotA > dotB) ? tangentA : tangentB;
-
-                float speed = sqrt(
-                    particle.velocity.x * particle.velocity.x +
-                    particle.velocity.y * particle.velocity.y
-                );
-
-                particle.velocity.x = tangent.x * speed;
-                particle.velocity.y = tangent.y * speed;
-            }
-
-            break;
+                RedirectVelocityAlongSurface(particle, normal);
         }
+}
 
-        case ObstacleShape::Airfoil:
-        {
+void WindWorld::ResolveAirfoilCollision(WindParticle& particle)
+{
             const int segmentCount = 32;
 
             const float chord = obstacleHalfSize * 3.0f;
             const float thicknessRatio = 0.12f;
-            const float leadingEdgeX =
-                obstaclePosition.x - chord * 0.5f;
+            float airfoilAngleRadians =
+                airfoilAngleDegrees * DEG2RAD;
 
             float closestDistanceSquared = 1000000000.0f;
 
@@ -564,32 +561,67 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                         0.1036f * x2 * x2 * x2 * x2
                     );
 
-                Vector2 upperStart =
+                Vector2 upperStartLocal =
                 {
-                    leadingEdgeX + x1 * chord,
-                    obstaclePosition.y - thickness1
+                    -chord * 0.5f + x1 * chord,
+                    -thickness1
                 };
+
+                Vector2 upperEndLocal =
+                {
+                    -chord * 0.5f + x2 * chord,
+                    -thickness2
+                };
+
+                Vector2 lowerStartLocal =
+                {
+                    -chord * 0.5f + x1 * chord,
+                    thickness1
+                };
+
+                Vector2 lowerEndLocal =
+                {
+                    -chord * 0.5f + x2 * chord,
+                    thickness2
+                };
+
+                Vector2 upperStart =
+                    AirfoilLocalToWorld(
+                        upperStartLocal,
+                        obstaclePosition,
+                        airfoilAngleRadians
+                    );
 
                 Vector2 upperEnd =
-                {
-                    leadingEdgeX + x2 * chord,
-                    obstaclePosition.y - thickness2
-                };
+                    AirfoilLocalToWorld(
+                        upperEndLocal,
+                        obstaclePosition,
+                        airfoilAngleRadians
+                    );
 
                 Vector2 lowerStart =
-                {
-                    leadingEdgeX + x1 * chord,
-                    obstaclePosition.y + thickness1
-                };
+                    AirfoilLocalToWorld(
+                        lowerStartLocal,
+                        obstaclePosition,
+                        airfoilAngleRadians
+                    );
 
                 Vector2 lowerEnd =
-                {
-                    leadingEdgeX + x2 * chord,
-                    obstaclePosition.y + thickness2
-                };
+                    AirfoilLocalToWorld(
+                        lowerEndLocal,
+                        obstaclePosition,
+                        airfoilAngleRadians
+                    );
+
+                Vector2 localParticlePosition =
+                    AirfoilWorldToLocal(
+                        particle.position,
+                        obstaclePosition,
+                        airfoilAngleRadians
+                    );
 
                 bool useUpperSurface =
-                    particle.position.y < obstaclePosition.y;
+                    localParticlePosition.y < 0.0f;
 
                 if (useUpperSurface)
                 {
@@ -610,8 +642,15 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
             }
 
             // Determine whether the particle center is inside the airfoil.
+            Vector2 localParticlePosition =
+                AirfoilWorldToLocal(
+                    particle.position,
+                    obstaclePosition,
+                    airfoilAngleRadians
+                );
+
             float normalizedX =
-                (particle.position.x - leadingEdgeX) / chord;
+                (localParticlePosition.x + chord * 0.5f) / chord;
 
             bool insideAirfoil = false;
 
@@ -630,7 +669,7 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                     );
 
                 float localY =
-                    particle.position.y - obstaclePosition.y;
+                    localParticlePosition.y;
 
                 insideAirfoil = fabs(localY) <= thickness;
             }
@@ -697,6 +736,33 @@ void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
                 }
             }
 
+}
+
+void WindWorld::ResolveParticleObstacleCollision(WindParticle& particle)
+{   
+    switch (selectedShape)
+    {
+        case ObstacleShape::Circle:
+        {
+            ResolveCircleCollision(particle);
+            break;
+        }
+
+        case ObstacleShape::Square:
+        {
+            ResolveSquareCollision(particle);
+            break;
+        }
+
+        case ObstacleShape::Diamond:
+        {
+            ResolveDiamondCollision(particle);
+            break;
+        }
+
+        case ObstacleShape::Airfoil:
+        {
+            ResolveAirfoilCollision(particle);
             break;
         }
     }
@@ -902,137 +968,359 @@ void WindWorld::ApplyObstacleInfluence(WindParticle& particle, float dt)
     }
 }
 
-void WindWorld::UpdateParticles(float dt)
+
+//Aerodynamics
+//------------
+void WindWorld::CalculateLift()
 {
-    float recoveryStrength = 6.0f;
+    float angleRadians =
+        airfoilAngleDegrees * DEG2RAD;
 
-    for (WindParticle& particle : particles)
+    float absoluteAngle =
+    fabsf(airfoilAngleDegrees);
+
+    float stallAngle = 15.0f;
+
+    if (absoluteAngle <= stallAngle)
     {
-        ApplyObstacleInfluence(particle, dt);
-
-        particle.position.x +=  particle.velocity.x * dt;
-        particle.position.y +=  particle.velocity.y * dt;
-
-        ResolveParticleObstacleCollision(particle);
-
-        
-        float dx = particle.position.x - obstaclePosition.x;
-        float dy = particle.position.y - obstaclePosition.y;
-        float distanceToObstacle = sqrt(dx * dx + dy * dy);
-
-        bool insideInfluence = 
-            distanceToObstacle <= obstacleInfluenceRadius;
-
-        if (!insideInfluence)
-        {
-            Vector2 difference = {velocity.x - particle.velocity.x, velocity.y - particle.velocity.y};
-
-            particle.velocity.x += difference.x * recoveryStrength * dt;
-            particle.velocity.y += difference.y * recoveryStrength * dt;
-        }
-
-        particle.trail.push_back(particle.position);
-
-        if (particle.trail.size() > 50)
-        {
-            particle.trail.erase(particle.trail.begin());
-        }
-
-        if (particle.position.x > tunnel.x + tunnel.width)
-        {   
-            particle.position.x = tunnel.x + 10.0f;
-            particle.position.y = GetRandomValue(
-                static_cast<int>(tunnel.y + 10.0f),
-                static_cast<int>(tunnel.y + tunnel.height - 10.0f)
+        liftCoefficient =
+            2.0f * PI * angleRadians;
+    }
+    else
+    {
+        float stallAmount =
+            std::clamp(
+                (absoluteAngle - stallAngle) / (maxAngle - stallAngle),
+                0.0f,
+                1.0f
             );
 
-            particle.velocity = velocity;
-            particle.trail.clear();
-        }
+        float maximumLiftCoefficient = 1.4f;
+
+        float stalledLiftCoefficient =
+            maximumLiftCoefficient *
+            (1.0f - stallAmount * 0.65f);
+
+        liftCoefficient =
+            airfoilAngleDegrees >= 0.0f
+            ? stalledLiftCoefficient
+            : -stalledLiftCoefficient;
     }
+
+    liftCoefficient =
+    std::clamp(
+        liftCoefficient,
+        -1.4f,
+        1.4f
+    );
+
+    float chordMeters =
+        (obstacleHalfSize * 3.0f) /
+        pixelsPerMeter;
+
+    float referenceArea =
+        chordMeters * airfoilSpan;
+
+    float windSpeedMetersPerSecond =
+        windSpeed / pixelsPerMeter;
+
+    float dynamicPressure =
+        0.5f *
+        airDensity *
+        windSpeedMetersPerSecond *
+        windSpeedMetersPerSecond;
+
+    liftForce =
+        dynamicPressure *
+        referenceArea *
+        liftCoefficient;
 }
 
-void WindWorld::HandleInput()
+void WindWorld::CalculateDrag()
 {
-    Vector2 mousePosition = GetMousePosition();
+    float baseDrag = 0.02f;
+    float inducedDragFactor = 0.08f;
 
-    Rectangle sliderHitbox = {
-        particleCountSlider.x,
-        particleCountSlider.y - 8.0f,
-        particleCountSlider.width,
-        particleCountSlider.height + 16.0f
+
+    float absoluteAngle =
+        fabsf(airfoilAngleDegrees);
+
+    float stallDrag = 0.0f;
+
+    float stallAngle = 15.0f;
+
+    if (absoluteAngle > stallAngle)
+    {
+        float stallAmount =
+            std::clamp(
+                (absoluteAngle - stallAngle) / (maxAngle - stallAngle),
+                0.0f,
+                1.0f
+            );
+
+        stallDrag =
+            stallAmount * 0.8f;
+    }
+
+    float chordMeters =
+        (obstacleHalfSize * 3.0f) /
+        pixelsPerMeter;
+
+    float referenceArea =
+        chordMeters * airfoilSpan;
+
+    float windSpeedMetersPerSecond =
+        windSpeed / pixelsPerMeter;
+
+    float dynamicPressure =
+        0.5f *
+        airDensity *
+        windSpeedMetersPerSecond *
+        windSpeedMetersPerSecond;
+
+    inducedDrag = liftCoefficient * liftCoefficient * inducedDragFactor;
+
+    dragCoefficient = baseDrag + inducedDrag + stallDrag;
+
+    dragForce =
+        dynamicPressure *
+        referenceArea *
+        dragCoefficient;
+}
+
+void WindWorld::DrawLiftVector()
+{
+    if (selectedShape != ObstacleShape::Airfoil)
+    {
+        return;
+    }
+
+    // Convert lift force into a visible arrow length.
+    float signedArrowLength =
+        liftForce * liftVectorPixelsPerNewton;
+
+    signedArrowLength =
+        std::clamp(
+            signedArrowLength,
+            -110.0f,
+            110.0f
+        );
+
+    // Do not draw an arrowhead when lift is nearly zero.
+    if (fabsf(signedArrowLength) < 1.0f)
+    {
+        DrawCircleV(
+            obstaclePosition,
+            4.0f,
+            BLACK
+        );
+
+        return;
+    }
+
+    Vector2 arrowStart =
+    {
+        obstaclePosition.x,
+        obstaclePosition.y
     };
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
-        CheckCollisionPointRec(mousePosition, sliderHitbox))
+    Vector2 arrowEnd =
     {
-        float mouseAmount =
-            (mousePosition.x - particleCountSlider.x) /
-            particleCountSlider.width;
+        obstaclePosition.x,
 
-        mouseAmount = std::clamp(mouseAmount, 0.0f, 1.0f);
+        // Positive lift points upward on the screen.
+        obstaclePosition.y - signedArrowLength
+    };
 
-        particleCount =
-            minParticleCount +
-            static_cast<int>(
-                mouseAmount *
-                (maxParticleCount - minParticleCount)
-            );
-    }
+    DrawLineEx(
+        arrowStart,
+        arrowEnd,
+        4.0f,
+        BLACK
+    );
 
-    Rectangle windSliderHitbox = {
-        windSpeedSlider.x,
-        windSpeedSlider.y - 8.0f,
-        windSpeedSlider.width,
-        windSpeedSlider.height + 16.0f
-        };
-
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
-        CheckCollisionPointRec(mousePosition, windSliderHitbox))
+    // Find the arrow's direction.
+    Vector2 arrowDirection =
     {
-        float mouseAmount =
-            (mousePosition.x - windSpeedSlider.x) /
-            windSpeedSlider.width;
+        arrowEnd.x - arrowStart.x,
+        arrowEnd.y - arrowStart.y
+    };
 
-        mouseAmount = std::clamp(mouseAmount, 0.0f, 1.0f);
+    float arrowLength =
+        sqrtf(
+            arrowDirection.x * arrowDirection.x +
+            arrowDirection.y * arrowDirection.y
+        );
 
-        windSpeed =
-            minWindSpeed +
-            mouseAmount * (maxWindSpeed - minWindSpeed);
+    arrowDirection.x /= arrowLength;
+    arrowDirection.y /= arrowLength;
 
-        velocity.x = windSpeed;
-        velocity.y = 0.0f;
-    }
-
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+    // Perpendicular vector used to create the arrowhead.
+    Vector2 perpendicular =
     {
-        if (CheckCollisionPointRec(mousePosition, circleButton))
-        {
-            selectedShape = ObstacleShape::Circle;
-            Reset();
-        }
+        -arrowDirection.y,
+        arrowDirection.x
+    };
 
-        if (CheckCollisionPointRec(mousePosition, squareButton))
-        {
-            selectedShape = ObstacleShape::Square;
-            Reset();
-        }
+    float arrowHeadLength = 14.0f;
+    float arrowHeadWidth = 7.0f;
 
-        if (CheckCollisionPointRec(mousePosition, diamondButton))
-        {
-            selectedShape = ObstacleShape::Diamond;
-            Reset();
-        }
+    Vector2 arrowHeadLeft =
+    {
+        arrowEnd.x -
+            arrowDirection.x * arrowHeadLength +
+            perpendicular.x * arrowHeadWidth,
 
-        if (CheckCollisionPointRec(mousePosition, airfoilButton))
-        {
-            selectedShape = ObstacleShape::Airfoil;
-            Reset();
-        }
-    }
-    
+        arrowEnd.y -
+            arrowDirection.y * arrowHeadLength +
+            perpendicular.y * arrowHeadWidth
+    };
+
+    Vector2 arrowHeadRight =
+    {
+        arrowEnd.x -
+            arrowDirection.x * arrowHeadLength -
+            perpendicular.x * arrowHeadWidth,
+
+        arrowEnd.y -
+            arrowDirection.y * arrowHeadLength -
+            perpendicular.y * arrowHeadWidth
+    };
+
+    DrawTriangle(
+        arrowEnd,
+        arrowHeadLeft,
+        arrowHeadRight,
+        BLACK
+    );
+
+    UIText(
+        TextFormat("Lift: %+.2f N/m", liftForce),
+        static_cast<int>(arrowEnd.x + 12.0f),
+        static_cast<int>(arrowEnd.y - 8.0f),
+        16,
+        BLACK
+    );
 }
 
+void WindWorld::DrawDragVector()
+{
+    if (selectedShape != ObstacleShape::Airfoil)
+    {
+        return;
+    }
+
+    // Convert lift force into a visible arrow length.
+    float signedArrowLength =
+        dragForce * dragVectorPixelsPerNewton;
+
+    signedArrowLength =
+        std::clamp(
+            signedArrowLength,
+            -110.0f,
+            110.0f
+        );
+
+    // Do not draw an arrowhead when drag is nearly zero.
+    if (fabsf(signedArrowLength) < 1.0f)
+    {
+        DrawCircleV(
+            obstaclePosition,
+            4.0f,
+            BLACK
+        );
+
+        return;
+    }
+
+    Vector2 arrowStart =
+    {
+        obstaclePosition.x,
+        obstaclePosition.y
+    };
+
+    Vector2 arrowEnd =
+    {
+        //Drag points left
+        obstaclePosition.x - signedArrowLength,
+
+        
+        obstaclePosition.y
+    };
+
+    DrawLineEx(
+        arrowStart,
+        arrowEnd,
+        4.0f,
+        BLACK
+    );
+
+    // Find the arrow's direction.
+    Vector2 arrowDirection =
+    {
+        arrowEnd.x - arrowStart.x,
+        arrowEnd.y - arrowStart.y
+    };
+
+    float arrowLength =
+        sqrtf(
+            arrowDirection.x * arrowDirection.x +
+            arrowDirection.y * arrowDirection.y
+        );
+
+    arrowDirection.x /= arrowLength;
+    arrowDirection.y /= arrowLength;
+
+    // Perpendicular vector used to create the arrowhead.
+    Vector2 perpendicular =
+    {
+        -arrowDirection.y,
+        arrowDirection.x
+    };
+
+    float arrowHeadLength = 14.0f;
+    float arrowHeadWidth = 7.0f;
+
+    Vector2 arrowHeadLeft =
+    {
+        arrowEnd.x -
+            arrowDirection.x * arrowHeadLength +
+            perpendicular.x * arrowHeadWidth,
+
+        arrowEnd.y -
+            arrowDirection.y * arrowHeadLength +
+            perpendicular.y * arrowHeadWidth
+    };
+
+    Vector2 arrowHeadRight =
+    {
+        arrowEnd.x -
+            arrowDirection.x * arrowHeadLength -
+            perpendicular.x * arrowHeadWidth,
+
+        arrowEnd.y -
+            arrowDirection.y * arrowHeadLength -
+            perpendicular.y * arrowHeadWidth
+    };
+
+    DrawTriangle(
+        arrowEnd,
+        arrowHeadLeft,
+        arrowHeadRight,
+        BLACK
+    );
+
+    UIText(
+        TextFormat("Drag: %.2f N/m", dragForce),
+        static_cast<int>(arrowEnd.x - 105.0f),
+        static_cast<int>(arrowEnd.y - 8.0f),
+        16,
+        BLACK
+    );
+}
+
+//Rendering
+//------------
 void WindWorld::DrawUI()
 {
     UIText("Particle Count", 20, 75, 18, GRAY);
@@ -1095,38 +1383,67 @@ void WindWorld::DrawUI()
         GRAY
     );
 
-    float freeStreamSpeed = sqrt(
-    velocity.x * velocity.x +
-    velocity.y * velocity.y
-);
+    // Particle visualization toggle
+    UIText(
+        "Visualization",
+        20,
+        220,
+        18,
+        GRAY
+    );
 
-    float minimumParticleSpeed = 0.0f;
-    float maximumParticleSpeed = 0.0f;
-
-    if (!particles.empty())
+    auto DrawVisualizationButton =
+        [&](Rectangle button,
+            const char* text,
+            bool selected)
     {
-        minimumParticleSpeed = sqrt(
-            particles[0].velocity.x * particles[0].velocity.x +
-            particles[0].velocity.y * particles[0].velocity.y
+        Color buttonColor =
+            selected ? ORANGE : LIGHTGRAY;
+
+        Color textColor =
+            selected ? WHITE : DARKGRAY;
+
+        DrawRectangleRounded(
+            button,
+            0.25f,
+            6,
+            buttonColor
         );
 
-        maximumParticleSpeed = minimumParticleSpeed;
+        DrawRectangleRoundedLines(
+            button,
+            0.25f,
+            6,
+            DARKGRAY
+        );
 
-        for (const WindParticle& particle : particles)
-        {
-            float particleSpeed = sqrt(
-                particle.velocity.x * particle.velocity.x +
-                particle.velocity.y * particle.velocity.y
-            );
+        int textWidth = MeasureText(text, 16);
 
-            minimumParticleSpeed =
-                std::min(minimumParticleSpeed, particleSpeed);
+        DrawText(
+            text,
+            static_cast<int>(
+                button.x +
+                (button.width - textWidth) / 2.0f
+            ),
+            static_cast<int>(button.y + 8.0f),
+            16,
+            textColor
+        );
+    };
 
-            maximumParticleSpeed =
-                std::max(maximumParticleSpeed, particleSpeed);
-        }
-    }
+    DrawVisualizationButton(
+        speedVisualizationButton,
+        "Speed",
+        particleVisualization ==
+            ParticleVisualization::Speed
+    );
 
+    DrawVisualizationButton(
+        pressureVisualizationButton,
+        "Pressure",
+        particleVisualization ==
+            ParticleVisualization::Pressure
+    );
 
     // Shape selection
     UIText("Obstacle Shape", 220, 0, 18, DARKGRAY);
@@ -1173,7 +1490,455 @@ void WindWorld::DrawUI()
         selectedShape == ObstacleShape::Airfoil);
 
 
+    if (selectedShape == ObstacleShape::Airfoil)
+    {
+        UIText(
+            "Angle of Attack",
+            20,
+            300,
+            18,
+            GRAY
+        );
+
+        DrawRectangleRec(
+            angleSlider,
+            LIGHTGRAY
+        );
+
+        float angleSliderAmount =
+            (airfoilAngleDegrees - minAngle) /
+            (maxAngle - minAngle);
+
+        float angleKnobX =
+            angleSlider.x +
+            angleSliderAmount *
+            angleSlider.width;
+
+        DrawCircle(
+            static_cast<int>(angleKnobX),
+            static_cast<int>(
+                angleSlider.y +
+                angleSlider.height / 2.0f
+            ),
+            7.0f,
+            DARKGRAY
+        );
+
+        UIText(
+            TextFormat(
+                "%+.1f degrees",
+                airfoilAngleDegrees
+            ),
+            20,
+            365,
+            18,
+            DARKGRAY
+        );
+
+        UIText(
+            TextFormat(
+                "Lift Coefficient: %+.2f",
+                liftCoefficient
+            ),
+            20,
+            395,
+            17,
+            DARKGRAY
+        );
+
+        UIText(
+            TextFormat(
+                "Lift: %+.2f N/m",
+                liftForce
+            ),
+            20,
+            420,
+            17,
+            DARKGRAY
+        );
+
+        UIText(
+            TextFormat(
+                "Drag Coefficient: %+.2f",
+                dragCoefficient
+            ),
+            20,
+            465,
+            17,
+            DARKGRAY
+        );
+
+        UIText(
+            TextFormat(
+                "Drag: %.2f N/m",
+                dragForce
+            ),
+            20,
+            490,
+            17,
+            DARKGRAY
+        );
+    }
+
+    
         
     UIText("R: Reset", 20, 20, 18, GRAY);
     UIText("Backspace: Menu", 20, 570, 18, GRAY);
+}
+
+void WindWorld::DrawParticles()
+{
+    for (const WindParticle& particle : particles)
+    {
+        float particleSpeed = Vector2Length(particle.velocity);
+        float referenceSpeed = Vector2Length(velocity);
+        
+        float pressureDifference =
+            0.5f * airDensity *
+            (referenceSpeed * referenceSpeed -
+            particleSpeed * particleSpeed);
+
+        float pressureScale = 5000.0f;
+
+        float pressureAmount =
+            std::clamp(pressureDifference / pressureScale, 
+            -1.0f,
+             1.0f
+        );
+
+        float dx =
+            particle.position.x - obstaclePosition.x;
+
+        float dy =
+            particle.position.y - obstaclePosition.y;
+
+        float distanceFromAirfoil =
+            sqrtf(dx * dx + dy * dy);
+
+        float pressureRadius = 180.0f;
+
+        float pressureWeight = std::clamp(
+            1.0f - distanceFromAirfoil / pressureRadius,
+            0.0f,
+            1.0f
+        );
+
+        pressureAmount *= pressureWeight;
+
+        if (particle.position.x > obstaclePosition.x)
+        {
+            float downstreamDistance =
+                particle.position.x - obstaclePosition.x;
+
+            float wakeFade = std::clamp(
+                1.0f - downstreamDistance / 120.0f,
+                0.0f,
+                1.0f
+            );
+
+            pressureAmount *= wakeFade;
+        }
+
+
+        float speed = sqrt(
+            particle.velocity.x * particle.velocity.x +
+            particle.velocity.y * particle.velocity.y
+        );
+
+        float referenceWindSpeed = sqrt(
+            velocity.x * velocity.x +
+            velocity.y * velocity.y
+        );
+
+        float minDisplaySpeed = windSpeed * 0.97f;
+        float maxDisplaySpeed = windSpeed * 1.03f;
+
+        float speedAmount = (speed - minDisplaySpeed) / 
+                            (maxDisplaySpeed - minDisplaySpeed);
+
+        speedAmount = std::clamp(speedAmount, 0.0f, 1.0f);
+
+        Color particleColor;
+
+        if (particleVisualization == 
+            ParticleVisualization::Speed)
+        {
+            if (speedAmount < 0.5f)
+            {
+                float t = speedAmount / 0.5f;
+                particleColor = ColorLerp(BLUE, GREEN, t);
+            }
+            else
+            {
+                float t = (speedAmount - 0.5f) / 0.5f;
+                particleColor = ColorLerp(GREEN, RED, t);
+            }
+        }
+        else
+        {
+            float angleRadians =
+                airfoilAngleDegrees * DEG2RAD;
+
+            Vector2 localPosition =
+                AirfoilWorldToLocal(particle.position, obstaclePosition, angleRadians);
+
+            float chordDistance =
+                fabsf(localPosition.x);
+
+            float surfaceDistance =
+                fabsf(localPosition.y);
+
+            float chord = obstacleHalfSize * 3.0f;
+
+            float normalizedChord =
+                (localPosition.x / chord) + 0.5f;
+
+            float chordWeight = std::clamp(
+                1.0f - normalizedChord,
+                0.0f,
+                1.0f
+            );
+
+            float surfaceWeight = std::clamp(
+                1.0f - surfaceDistance / 80.0f,
+                0.0f,
+                1.0f
+            );
+
+            pressureAmount *=
+                chordWeight *
+                surfaceWeight;
+
+            if (pressureAmount > 0.0f)
+            {
+                particleColor = ColorLerp(
+                    LIGHTGRAY,
+                    RED,
+                    pressureAmount
+                );
+            }
+            else
+            {
+                particleColor = ColorLerp(
+                    LIGHTGRAY,
+                    BLUE,
+                    -pressureAmount
+                );
+            }
+        }
+
+        //Draw Trials in either visualization mode
+        for (size_t i = 1; i < particle.trail.size(); i++)
+        {
+            float alpha =
+                static_cast<float>(i) /
+                static_cast<float>(particle.trail.size());
+
+            DrawLineEx(
+                particle.trail[i - 1],
+                particle.trail[i],
+                1.0f,
+                Fade(particleColor, alpha)
+            );
+        }
+       
+        
+
+        DrawCircleV(
+            particle.position,
+            particle.radius,
+            particleColor
+        );
+    }
+}
+
+void WindWorld::DrawCircleObstacle()
+{
+     DrawCircleV(
+            obstaclePosition,
+            obstacleHalfSize,
+            obstacleColor
+        );
+}
+
+void WindWorld::DrawSquareObstacle()
+{
+    DrawRectanglePro(
+            {
+                obstaclePosition.x,
+                obstaclePosition.y,
+                obstacleHalfSize * 2.0f,
+                obstacleHalfSize * 2.0f
+            },
+            {
+                obstacleHalfSize,
+                obstacleHalfSize
+            },
+            0.0f,
+            obstacleColor
+        );
+}
+
+void WindWorld::DrawDiamondObstacle()
+{
+    DrawRectanglePro(
+            {
+                obstaclePosition.x,
+                obstaclePosition.y,
+                obstacleHalfSize * 2.0f,
+                obstacleHalfSize * 2.0f
+            },
+            {
+                obstacleHalfSize,
+                obstacleHalfSize
+            },
+            45.0f,
+            obstacleColor
+        );
+}
+
+void WindWorld::DrawAirfoilObstacle()
+{
+        const int segmentCount = 32;
+
+        float chord = obstacleHalfSize * 3.0f;
+        float thicknessRatio = 0.12f;
+        float airfoilAngleRadians =
+            airfoilAngleDegrees * DEG2RAD;
+
+
+        for (int i = 0; i < segmentCount; i++)
+        {
+            float x1 = static_cast<float>(i) /
+                    static_cast<float>(segmentCount);
+
+            float x2 = static_cast<float>(i + 1) /
+                    static_cast<float>(segmentCount);
+
+            float thickness1 =
+                5.0f * thicknessRatio * chord *
+                (
+                    0.2969f * sqrtf(x1) -
+                    0.1260f * x1 -
+                    0.3516f * x1 * x1 +
+                    0.2843f * x1 * x1 * x1 -
+                    0.1036f * x1 * x1 * x1 * x1
+                );
+
+            float thickness2 =
+                5.0f * thicknessRatio * chord *
+                (
+                    0.2969f * sqrtf(x2) -
+                    0.1260f * x2 -
+                    0.3516f * x2 * x2 +
+                    0.2843f * x2 * x2 * x2 -
+                    0.1036f * x2 * x2 * x2 * x2
+                );
+
+            Vector2 upperStartLocal =
+            {
+                -chord * 0.5f + x1 * chord,
+                -thickness1
+            };
+
+            Vector2 upperEndLocal =
+            {
+                -chord * 0.5f + x2 * chord,
+                -thickness2
+            };
+
+            Vector2 lowerStartLocal =
+            {
+                -chord * 0.5f + x1 * chord,
+                thickness1
+            };
+
+            Vector2 lowerEndLocal =
+            {
+                -chord * 0.5f + x2 * chord,
+                thickness2
+            };
+
+            Vector2 upperStart =
+                AirfoilLocalToWorld(
+                    upperStartLocal,
+                    obstaclePosition,
+                    airfoilAngleRadians
+                );
+
+            Vector2 upperEnd =
+                AirfoilLocalToWorld(
+                    upperEndLocal,
+                    obstaclePosition,
+                    airfoilAngleRadians
+                );
+
+            Vector2 lowerStart =
+                AirfoilLocalToWorld(
+                    lowerStartLocal,
+                    obstaclePosition,
+                    airfoilAngleRadians
+                );
+
+            Vector2 lowerEnd =
+                AirfoilLocalToWorld(
+                    lowerEndLocal,
+                    obstaclePosition,
+                    airfoilAngleRadians
+                );
+
+            DrawTriangle(
+                upperStart,
+                lowerStart,
+                upperEnd,
+                obstacleColor
+            );
+
+            DrawTriangle(
+                upperEnd,
+                lowerStart,
+                lowerEnd,
+                obstacleColor
+            );
+        }
+
+}
+
+void WindWorld::Draw()
+{
+    ClearBackground(Color{ 225, 235, 245, 255});
+
+    DrawRectangleLinesEx(tunnel, 8.0f, LIGHTGRAY);
+
+    DrawParticles();
+
+    switch (selectedShape)
+    {
+        case ObstacleShape::Circle:
+        {
+            DrawCircleObstacle();
+            break;
+        }
+
+        case ObstacleShape::Square:
+        {
+            DrawSquareObstacle();
+            break;
+        }
+
+        case ObstacleShape::Diamond:
+        {
+            DrawDiamondObstacle();
+            break;
+        }
+
+        case ObstacleShape::Airfoil:
+        {
+            DrawAirfoilObstacle();
+            break;
+        }
+    }
+    DrawLiftVector();
+    DrawDragVector();
+    DrawUI();
 }

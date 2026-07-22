@@ -546,222 +546,584 @@ int main()
         BeginDrawing();
 
         if (currentState == AppState::MainMenu)
-    {
-        ClearBackground({245, 247, 250, 255});
-
-        UIText("PHYSICS SANDBOX", 360, 55, 44, BLACK);
-        UIText("Choose a simulation to begin", 410, 110, 20, GRAY);
-
-        Rectangle collisionButton = { 40, 170, 220, 320 };
-        Rectangle orbitalButton   = { 290, 170, 220, 320 };
-        Rectangle fluidButton     = { 540, 170, 220, 320 };
-        Rectangle windButton      = {790, 170, 220, 320};
-
-        Vector2 mouse = GetMousePosition();
-
-        Color collisionFill =
-            CheckCollisionPointRec(mouse, collisionButton)
-            ? Fade(BLUE, 0.08f)
-            : WHITE;
-
-        Color orbitalFill =
-            CheckCollisionPointRec(mouse, orbitalButton)
-            ? Fade(GREEN, 0.08f)
-            : WHITE;
-
-        Color fluidFill =
-            CheckCollisionPointRec(mouse, fluidButton)
-            ? Fade(SKYBLUE, 0.08f)
-            : WHITE;
-
-        Color windFill =
-            CheckCollisionPointRec(mouse, windButton)
-            ? Fade(RED, 0.08f)
-            : WHITE;
-
-        DrawRectangleRounded(collisionButton, 0.04f, 12, collisionFill);
-        DrawRectangleRounded(orbitalButton, 0.04f, 12, orbitalFill);
-        DrawRectangleRounded(fluidButton, 0.04f, 12, fluidFill);
-        DrawRectangleRounded(windButton, 0.04f, 12, windFill);
-
-        DrawRectangleRoundedLines(collisionButton, 0.04f, 12, BLUE);
-        DrawRectangleRoundedLines(orbitalButton, 0.04f, 12, GREEN);
-        DrawRectangleRoundedLines(fluidButton, 0.04f, 12, SKYBLUE);
-        DrawRectangleRoundedLines(windButton, 0.04f, 12, RED);
-
-        //========================
-        // Collision Card
-        //========================
-
-        UIText("RIGID BODY", 65, 205, 24, BLUE);
-        UIText("COLLISION SIM", 65, 235, 24, BLUE);
-
-        DrawCircle(105, 350, 28, BLUE);
-        DrawCircle(195, 350, 28, RED);
-
-        // Blue ->
-        DrawLineEx({135, 350}, {148, 350}, 2.0f, BLACK);
-        DrawLineEx({148, 350}, {144, 347}, 2.0f, BLACK);
-        DrawLineEx({148, 350}, {144, 353}, 2.0f, BLACK);
-
-        // <- Red
-        DrawLineEx({165, 350}, {152, 350}, 2.0f, BLACK);
-        DrawLineEx({152, 350}, {156, 347}, 2.0f, BLACK);
-        DrawLineEx({152, 350}, {156, 353}, 2.0f, BLACK);
-
-        DrawCircle(150, 435, 22, GREEN);
-
-        DrawLine(90, 460, 210, 460, BLACK);
-
-        //========================
-        // Orbital Card
-        //========================
-
-        UIText("ORBITAL SIM", 315, 220, 24, GREEN);
-
-        DrawCircle(400, 365, 30, YELLOW);
-
-        DrawEllipseLines(400, 365, 95, 55, BLUE);
-        DrawEllipseLines(400, 365, 65, 35, DARKGREEN);
-
-        DrawCircle(475, 310, 12, BLUE);
-        DrawCircle(330, 425, 10, DARKGREEN);
-
-        //========================
-        // Fluid Card
-        //========================
-
-        UIText("FLUID SIM", 565, 220, 24, SKYBLUE);
-
-        Rectangle cube = { 620, 400, 35, 35 };
-
-        DrawRectanglePro(
-            cube,
-            { 17.5f, 17.5f },   // center of rotation
-            -12.0f,             // rotation angle
-            ORANGE
-        );
-        DrawCircle(705, 400, 18, LIGHTGRAY);
-
-        for (const Vector2& particle : menuFluidParticles)
         {
-            DrawCircleV(particle, 2, BLUE);
-        }
+            ClearBackground(Color{ 245, 247, 250, 255 });
 
-        //========================
-        // Wind Card
-        //========================
+            //========================
+            // Header
+            //========================
 
-        UIText("WIND SIM", 815, 220, 24, RED);
+            UIText(
+                "PHYSICS SANDBOX",
+                342,
+                25,
+                42,
+                BLACK
+            );
 
-        Vector2 windObstacle = { 900.0f, 385.0f };
-        float windObstacleRadius = 24.0f;
+            UIText(
+                "Choose a simulation to begin",
+                395,
+                73,
+                18,
+                GRAY
+            );
 
-        // Streamlines above and below the obstacle.
-        float streamlineY[] =
-        {
-            300.0f,
-            322.0f,
-            344.0f,
-            366.0f,
-            404.0f,
-            426.0f,
-            448.0f,
-            470.0f
-        };
+            //========================
+            // Card rectangles
+            //========================
 
-        for (float baseY : streamlineY)
-        {
-            Vector2 previousPoint = { 805.0f, baseY };
-
-            for (int pointIndex = 1; pointIndex <= 24; pointIndex++)
+            Rectangle windButton =
             {
-                float x = 805.0f + pointIndex * 8.0f;
+                105.0f,
+                110.0f,
+                840.0f,
+                230.0f
+            };
 
-                float dx = x - windObstacle.x;
-                float verticalDistance = fabs(baseY - windObstacle.y);
+            Rectangle collisionButton =
+            {
+                105.0f,
+                365.0f,
+                260.0f,
+                175.0f
+            };
 
-                // Strongest bend near the obstacle and weaker farther away.
-                float horizontalInfluence =
-                    expf(-(dx * dx) / 1800.0f);
+            Rectangle orbitalButton =
+            {
+                395.0f,
+                365.0f,
+                260.0f,
+                175.0f
+            };
 
-                float verticalInfluence =
-                    std::clamp(
-                        (75.0f - verticalDistance) / 75.0f,
-                        0.0f,
-                        1.0f
-                    );
+            Rectangle fluidButton =
+            {
+                685.0f,
+                365.0f,
+                260.0f,
+                175.0f
+            };
 
-                float bendDirection =
-                    baseY < windObstacle.y ? -1.0f : 1.0f;
+            Rectangle enterWindButton =
+            {
+                135.0f,
+                275.0f,
+                190.0f,
+                42.0f
+            };
 
-                float bend =
-                    bendDirection *
-                    horizontalInfluence *
-                    verticalInfluence *
-                    35.0f;
+            Vector2 mouse = GetMousePosition();
 
-                Vector2 currentPoint =
-                {
-                    x,
-                    baseY + bend
-                };
+            bool windHovered =
+                CheckCollisionPointRec(mouse, windButton);
 
-                DrawLineEx(
-                    previousPoint,
-                    currentPoint,
-                    1.5f,
-                    SKYBLUE
-                );
+            bool collisionHovered =
+                CheckCollisionPointRec(mouse, collisionButton);
 
-                previousPoint = currentPoint;
-            }
+            bool orbitalHovered =
+                CheckCollisionPointRec(mouse, orbitalButton);
 
-            // Arrowhead at the right side of each streamline.
-            float arrowX = 997.0f;
+            bool fluidHovered =
+                CheckCollisionPointRec(mouse, fluidButton);
 
-            DrawTriangle(
-                { arrowX, baseY },
-                { arrowX - 7.0f, baseY - 4.0f },
-                { arrowX - 7.0f, baseY + 4.0f },
+            Color windFill =
+                windHovered
+                ? Fade(RED, 0.08f)
+                : WHITE;
+
+            Color collisionFill =
+                collisionHovered
+                ? Fade(BLUE, 0.08f)
+                : WHITE;
+
+            Color orbitalFill =
+                orbitalHovered
+                ? Fade(GREEN, 0.08f)
+                : WHITE;
+
+            Color fluidFill =
+                fluidHovered
+                ? Fade(SKYBLUE, 0.10f)
+                : WHITE;
+
+            //========================
+            // Draw card backgrounds
+            //========================
+
+            DrawRectangleRounded(
+                windButton,
+                0.035f,
+                12,
+                windFill
+            );
+
+            DrawRectangleRoundedLines(
+                windButton,
+                0.035f,
+                12,
+                RED
+            );
+
+            DrawRectangleRounded(
+                collisionButton,
+                0.045f,
+                12,
+                collisionFill
+            );
+
+            DrawRectangleRoundedLines(
+                collisionButton,
+                0.045f,
+                12,
+                BLUE
+            );
+
+            DrawRectangleRounded(
+                orbitalButton,
+                0.045f,
+                12,
+                orbitalFill
+            );
+
+            DrawRectangleRoundedLines(
+                orbitalButton,
+                0.045f,
+                12,
+                GREEN
+            );
+
+            DrawRectangleRounded(
+                fluidButton,
+                0.045f,
+                12,
+                fluidFill
+            );
+
+            DrawRectangleRoundedLines(
+                fluidButton,
+                0.045f,
+                12,
                 SKYBLUE
             );
+
+            //========================
+            // Featured wind card
+            //========================
+
+            Rectangle featuredBadge =
+            {
+                130.0f,
+                130.0f,
+                115.0f,
+                28.0f
+            };
+
+            DrawRectangleRounded(
+                featuredBadge,
+                0.25f,
+                8,
+                RED
+            );
+
+            UIText(
+                "* FEATURED",
+                143,
+                136,
+                15,
+                WHITE
+            );
+
+            UIText(
+                "WIND SIM",
+                135,
+                175,
+                32,
+                RED
+            );
+
+            UIText(
+                "AERODYNAMIC WIND TUNNEL",
+                135,
+                212,
+                17,
+                DARKGRAY
+            );
+
+            UIText(
+                "Airfoils | Flowfields | Wake Turbulence",
+                135,
+                242,
+                15,
+                GRAY
+            );
+
+            
+
+            //========================
+            // Wind streamlines
+            //========================
+
+            Vector2 windObstacle =
+            {
+                690.0f,
+                225.0f
+            };
+
+            float windObstacleRadius = 27.0f;
+
+            float streamlineY[] =
+            {
+                145.0f,
+                165.0f,
+                185.0f,
+                205.0f,
+                245.0f,
+                265.0f,
+                285.0f,
+                305.0f
+            };
+
+            for (float baseY : streamlineY)
+            {
+                Vector2 previousPoint =
+                {
+                    430.0f,
+                    baseY
+                };
+
+                for (int pointIndex = 1;
+                    pointIndex <= 55;
+                    pointIndex++)
+                {
+                    float x =
+                        430.0f +
+                        pointIndex * 8.5f;
+
+                    float dx =
+                        x - windObstacle.x;
+
+                    float verticalDistance =
+                        fabsf(
+                            baseY -
+                            windObstacle.y
+                        );
+
+                    float horizontalInfluence =
+                        expf(
+                            -(dx * dx) /
+                            6000.0f
+                        );
+
+                    float verticalInfluence =
+                        std::clamp(
+                            (95.0f - verticalDistance) /
+                            95.0f,
+                            0.0f,
+                            1.0f
+                        );
+
+                    float bendDirection =
+                        baseY < windObstacle.y
+                        ? -1.0f
+                        : 1.0f;
+
+                    float bend =
+                        bendDirection *
+                        horizontalInfluence *
+                        verticalInfluence *
+                        42.0f;
+
+                    Vector2 currentPoint =
+                    {
+                        x,
+                        baseY + bend
+                    };
+
+                    DrawLineEx(
+                        previousPoint,
+                        currentPoint,
+                        1.6f,
+                        Fade(BLUE, 0.65f)
+                    );
+
+                    previousPoint =
+                        currentPoint;
+                }
+
+                float arrowX = 905.0f;
+
+                DrawTriangle(
+                    {
+                        arrowX,
+                        baseY
+                    },
+                    {
+                        arrowX - 8.0f,
+                        baseY - 4.0f
+                    },
+                    {
+                        arrowX - 8.0f,
+                        baseY + 4.0f
+                    },
+                    BLUE
+                );
+            }
+
+            DrawCircleV(
+                windObstacle,
+                windObstacleRadius,
+                RED
+            );
+
+            DrawCircleLines(
+                static_cast<int>(
+                    windObstacle.x
+                ),
+                static_cast<int>(
+                    windObstacle.y
+                ),
+                windObstacleRadius + 2.0f,
+                Fade(DARKGRAY, 0.35f)
+            );
+
+            //========================
+            // Collision card
+            //========================
+
+            UIText(
+                "RIGID BODY",
+                130,
+                385,
+                20,
+                BLUE
+            );
+
+            UIText(
+                "COLLISION SIM",
+                130,
+                410,
+                20,
+                BLUE
+            );
+
+            DrawCircle(
+                175,
+                475,
+                22,
+                BLUE
+            );
+
+            DrawCircle(
+                290,
+                475,
+                22,
+                RED
+            );
+
+            DrawLineEx(
+                { 200.0f, 475.0f },
+                { 221.0f, 475.0f },
+                2.0f,
+                BLACK
+            );
+
+            DrawLineEx(
+                { 221.0f, 475.0f },
+                { 215.0f, 470.0f },
+                2.0f,
+                BLACK
+            );
+
+            DrawLineEx(
+                { 221.0f, 475.0f },
+                { 215.0f, 480.0f },
+                2.0f,
+                BLACK
+            );
+
+            DrawLineEx(
+                { 265.0f, 475.0f },
+                { 244.0f, 475.0f },
+                2.0f,
+                BLACK
+            );
+
+            DrawLineEx(
+                { 244.0f, 475.0f },
+                { 250.0f, 470.0f },
+                2.0f,
+                BLACK
+            );
+
+            DrawLineEx(
+                { 244.0f, 475.0f },
+                { 250.0f, 480.0f },
+                2.0f,
+                BLACK
+            );
+
+            //========================
+            // Orbital card
+            //========================
+
+            UIText(
+                "ORBITAL SIM",
+                420,
+                390,
+                21,
+                GREEN
+            );
+
+            DrawCircle(
+                525,
+                475,
+                24,
+                YELLOW
+            );
+
+            DrawEllipseLines(
+                525,
+                475,
+                85,
+                42,
+                BLUE
+            );
+
+            DrawEllipseLines(
+                525,
+                475,
+                57,
+                27,
+                DARKGREEN
+            );
+
+            DrawCircle(
+                595,
+                438,
+                9,
+                BLUE
+            );
+
+            DrawCircle(
+                460,
+                510,
+                8,
+                DARKGREEN
+            );
+
+            //========================
+            // Fluid card
+            //========================
+
+            UIText(
+                "FLUID SIM",
+                710,
+                390,
+                21,
+                SKYBLUE
+            );
+
+            Rectangle fluidCube =
+            {
+                785.0f,
+                455.0f,
+                30.0f,
+                30.0f
+            };
+
+            DrawRectanglePro(
+                fluidCube,
+                {
+                    15.0f,
+                    15.0f
+                },
+                -12.0f,
+                ORANGE
+            );
+
+            DrawCircle(
+                885,
+                470,
+                15,
+                LIGHTGRAY
+            );
+
+            for (const Vector2& particle :
+                menuFluidParticles)
+            {
+                Vector2 menuParticlePosition =
+                {
+                    particle.x + 150.0f,
+                    particle.y + 45.0f
+                };
+
+                if (CheckCollisionPointRec(
+                        menuParticlePosition,
+                        fluidButton))
+                {
+                    DrawCircleV(
+                        menuParticlePosition,
+                        1.7f,
+                        BLUE
+                    );
+                }
+            }
+
+            //========================
+            // Footer
+            //========================
+
+            UIText(
+                "Use mouse to select",
+                425,
+                565,
+                17,
+                GRAY
+            );
+
+            //========================
+            // Menu input
+            //========================
+
+            if (IsMouseButtonPressed(
+                    MOUSE_LEFT_BUTTON))
+            {
+                if (CheckCollisionPointRec(
+                        mouse,
+                        windButton))
+                {
+                    currentState =
+                        AppState::WindSim;
+                }
+                else if (
+                    CheckCollisionPointRec(
+                        mouse,
+                        collisionButton))
+                {
+                    currentState =
+                        AppState::CollisionSim;
+                }
+                else if (
+                    CheckCollisionPointRec(
+                        mouse,
+                        orbitalButton))
+                {
+                    currentState =
+                        AppState::OrbitalSim;
+                }
+                else if (
+                    CheckCollisionPointRec(
+                        mouse,
+                        fluidButton))
+                {
+                    currentState =
+                        AppState::FluidSim;
+                }
+            
+            }
         }
 
-        // Circular wind-tunnel obstacle.
-        DrawCircleV(
-            windObstacle,
-            windObstacleRadius,
-            RED
-        );
-
-
-        UIText("Use mouse to select", 430, 540, 22, GRAY);
-
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-        {
-            if (CheckCollisionPointRec(mouse, collisionButton))
-            {
-                currentState = AppState::CollisionSim;
-            }
-
-            if (CheckCollisionPointRec(mouse, orbitalButton))
-            {
-                currentState = AppState::OrbitalSim;
-            }
-
-            if (CheckCollisionPointRec(mouse, fluidButton))
-            {
-                currentState = AppState::FluidSim;
-            }
-
-            if (CheckCollisionPointRec(mouse, windButton))
-            {
-                currentState = AppState::WindSim;
-            }
-
-        }
-    }
         //Collision Sim Run
         else if (currentState == AppState::CollisionSim)
         {

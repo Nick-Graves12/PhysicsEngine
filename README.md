@@ -35,15 +35,15 @@ A physics sandbox written from scratch in C++ using Raylib to explore collision 
 - Real-time fluid rendering at interactive frame rates
 
 ## Wind Simulator
-- Adjustable wind speed with real-time particle flow visualization
-- Multiple obstacle shapes including circle, square, diamond, and NACA airfoil
-- Particle deflection around obstacles to illustrate basic aerodynamic flow
+- Adjustable wind speed, particle count, and airfoil angle of attack
+- Four obstacle types: circle, square, diamond, and NACA 0012 airfoil
+- Real-time particle-based airflow with streamline visualization and particle trails
 - Surface-following collision response using normals and tangential velocity projection
-- Wake generation with adjustable turbulence and downstream disturbances
-- Particle trails for visualizing streamlines and flow patterns
-- Real-time obstacle interaction with continuous particle spawning and recycling
-- Interactive controls for comparing flow behavior across different obstacle geometries
-- Built using C++ and raylib with a custom particle-based physics system
+- Speed and pressure visualization modes for comparing flow behavior
+- Lift and drag force calculations with real-time force vector visualization
+- Simplified aerodynamic stall model demonstrating lift loss and drag increase at high angles of attack
+- Interactive comparison of flow behavior and aerodynamic forces across different obstacle geometries
+- Built in C++ with raylib using a custom particle-based physics and visualization system
 
 ## Built With
 
@@ -73,7 +73,7 @@ This project is being developed as a long-term learning project to explore:
 ## Screenshots
 -Main Menu
 
-![Main Menu](screenshots/menu-v2.png)
+![Main Menu](screenshots/menu-v3.png)
 
 
 ## Collision Sandbox
@@ -92,7 +92,7 @@ This project is being developed as a long-term learning project to explore:
 
 ## Wind Sandbox
 
-![Fluid Sandbox](screenshots/wind-sim-demo.gif)
+![Fluid Sandbox](screenshots/wind-sim-demo2.gif)
 
 
 ## How to Build
