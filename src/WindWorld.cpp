@@ -18,10 +18,10 @@ void WindWorld::Reset()
     obstacleInfluenceRadius = 120.0f;
     obstacleColor = RED;
 
-    circleButton  = { 220, 20, 90, 32 };
-    squareButton  = { 320, 20, 90, 32 };
-    diamondButton = { 420, 20, 90, 32 };
-    airfoilButton = { 520, 20, 90, 32 };
+    circleButton  = { 385, 32, 90, 32 };
+    squareButton  = { 485, 32, 90, 32 };
+    diamondButton = { 585, 32, 90, 32 };
+    airfoilButton = { 685, 32, 90, 32 };
 
 
     particles.clear();
@@ -52,6 +52,8 @@ void WindWorld::Update(float dt)
 }
 
 
+
+//------------
 //Geometry Helpers
 //------------
 Vector2 WindWorld::RotatePoint(Vector2 point, float angleRadians)
@@ -89,6 +91,9 @@ Vector2 WindWorld::AirfoilWorldToLocal(Vector2 worldPoint, Vector2 airfoilCenter
     return RotatePoint(relativePoint, -angleRadians);
 }
 
+
+
+//------------
 //Input
 //------------
 void WindWorld::HandleInput()
@@ -221,6 +226,8 @@ void WindWorld::HandleInput()
 }
 
 
+
+//------------
 //Particles
 //------------
 void WindWorld::SpawnParticle(Vector2 spawnPosition)
@@ -286,6 +293,8 @@ void WindWorld::UpdateParticles(float dt)
 }
 
 
+
+//------------
 //Collisions
 //------------
 void WindWorld::RedirectVelocityAlongSurface(WindParticle& particle, Vector2 normal)
@@ -969,6 +978,8 @@ void WindWorld::ApplyObstacleInfluence(WindParticle& particle, float dt)
 }
 
 
+
+//------------
 //Aerodynamics
 //------------
 void WindWorld::CalculateLift()
@@ -1312,18 +1323,67 @@ void WindWorld::DrawDragVector()
 
     UIText(
         TextFormat("Drag: %.2f N/m", dragForce),
-        static_cast<int>(arrowEnd.x - 105.0f),
+        static_cast<int>(arrowEnd.x - 115.0f),
         static_cast<int>(arrowEnd.y - 8.0f),
         16,
         BLACK
     );
 }
 
+
+
+//------------
 //Rendering
 //------------
 void WindWorld::DrawUI()
 {
-    UIText("Particle Count", 20, 75, 18, GRAY);
+    float controlsPanelHeight =
+        selectedShape == ObstacleShape::Airfoil
+        ? 525.0f
+        : 280.0f;
+
+    Rectangle controlsPanel = {
+        10.0f,
+        10.0f,
+        170.0f,
+        controlsPanelHeight
+    };
+
+    DrawRectangleRounded(
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(WHITE, 0.88f)
+    );
+
+    DrawRectangleRoundedLines(
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(DARKGRAY, 0.35f)
+    );
+
+    UIText("Wind simulation", 20, 18, 18, DARKGRAY);
+    DrawLine(20, 43, 170, 43, Fade(DARKGRAY, 0.30f));
+    UIText("R: Reset", 20, 52, 16, GRAY);
+
+    UIText("Particle count", 20, 75, 16, GRAY);
+
+    const char* particleCountText = TextFormat("%i", particleCount);
+    float particleCountTextWidth = MeasureTextEx(
+        uiFont,
+        particleCountText,
+        14,
+        1.0f
+    ).x;
+
+    UIText(
+        particleCountText,
+        170.0f - particleCountTextWidth,
+        75,
+        14,
+        GRAY
+    );
 
     DrawRectangleRec(particleCountSlider, LIGHTGRAY);
 
@@ -1335,25 +1395,65 @@ void WindWorld::DrawUI()
         particleCountSlider.x +
         sliderAmount * particleCountSlider.width;
 
+    DrawRectangle(
+        particleCountSlider.x,
+        particleCountSlider.y,
+        knobX - particleCountSlider.x,
+        particleCountSlider.height,
+        Fade(ORANGE, 0.70f)
+    );
+
+    Rectangle particleSliderHitbox = {
+        particleCountSlider.x,
+        particleCountSlider.y - 8.0f,
+        particleCountSlider.width,
+        particleCountSlider.height + 16.0f
+    };
+
+    bool particleSliderHovered = CheckCollisionPointRec(
+        GetMousePosition(),
+        particleSliderHitbox
+    );
+
+    Color particleKnobColor =
+        particleSliderHovered ? GRAY : DARKGRAY;
+
+    float particleKnobRadius =
+        particleSliderHovered ? 8.0f : 7.0f;
+
+    if (particleSliderHovered &&
+        IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        particleKnobColor = ORANGE;
+    }
+
     DrawCircle(
         static_cast<int>(knobX),
         static_cast<int>(
             particleCountSlider.y +
             particleCountSlider.height / 2.0f
         ),
-        7.0f,
-        DARKGRAY
+        particleKnobRadius,
+        particleKnobColor
     );
+
+    UIText("Wind speed", 20, 155, 16, GRAY);
+
+    const char* windSpeedText = TextFormat("%.0f", windSpeed);
+    float windSpeedTextWidth = MeasureTextEx(
+        uiFont,
+        windSpeedText,
+        14,
+        1.0f
+    ).x;
 
     UIText(
-        TextFormat("%i", particleCount),
-        20,
-        115,
-        18,
+        windSpeedText,
+        170.0f - windSpeedTextWidth,
+        155,
+        14,
         GRAY
     );
-
-    UIText("Wind Speed", 20, 155, 18, GRAY);
 
     DrawRectangleRec(windSpeedSlider, LIGHTGRAY);
 
@@ -1365,22 +1465,42 @@ void WindWorld::DrawUI()
         windSpeedSlider.x +
         windSliderAmount * windSpeedSlider.width;
 
+    DrawRectangle(
+        windSpeedSlider.x,
+        windSpeedSlider.y,
+        windKnobX - windSpeedSlider.x,
+        windSpeedSlider.height,
+        Fade(ORANGE, 0.70f)
+    );
+
+    Rectangle windSliderHitbox = {
+        windSpeedSlider.x,
+        windSpeedSlider.y - 8.0f,
+        windSpeedSlider.width,
+        windSpeedSlider.height + 16.0f
+    };
+
+    bool windSliderHovered = CheckCollisionPointRec(
+        GetMousePosition(),
+        windSliderHitbox
+    );
+
+    Color windKnobColor = windSliderHovered ? GRAY : DARKGRAY;
+    float windKnobRadius = windSliderHovered ? 8.0f : 7.0f;
+
+    if (windSliderHovered && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        windKnobColor = ORANGE;
+    }
+
     DrawCircle(
         static_cast<int>(windKnobX),
         static_cast<int>(
             windSpeedSlider.y +
             windSpeedSlider.height / 2.0f
         ),
-        7.0f,
-        DARKGRAY
-    );
-
-    UIText(
-        TextFormat("%.0f", windSpeed),
-        20,
-        195,
-        18,
-        GRAY
+        windKnobRadius,
+        windKnobColor
     );
 
     // Particle visualization toggle
@@ -1388,7 +1508,7 @@ void WindWorld::DrawUI()
         "Visualization",
         20,
         220,
-        18,
+        16,
         GRAY
     );
 
@@ -1397,11 +1517,26 @@ void WindWorld::DrawUI()
             const char* text,
             bool selected)
     {
-        Color buttonColor =
-            selected ? ORANGE : LIGHTGRAY;
+        bool hovered = CheckCollisionPointRec(
+            GetMousePosition(),
+            button
+        );
 
-        Color textColor =
-            selected ? WHITE : DARKGRAY;
+        Color buttonColor = selected ? ORANGE : LIGHTGRAY;
+        Color textColor = selected ? WHITE : DARKGRAY;
+
+        if (hovered)
+        {
+            buttonColor = selected
+                ? Color{ 255, 175, 60, 255 }
+                : Color{ 245, 230, 210, 255 };
+
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            {
+                buttonColor = Color{ 210, 120, 20, 255 };
+                textColor = WHITE;
+            }
+        }
 
         DrawRectangleRounded(
             button,
@@ -1417,15 +1552,18 @@ void WindWorld::DrawUI()
             DARKGRAY
         );
 
-        int textWidth = MeasureText(text, 16);
-
-        DrawText(
+        float textWidth = MeasureTextEx(
+            uiFont,
             text,
-            static_cast<int>(
-                button.x +
-                (button.width - textWidth) / 2.0f
-            ),
-            static_cast<int>(button.y + 8.0f),
+            16,
+            1.0f
+        ).x;
+
+        UIText(
+            text,
+            button.x +
+                (button.width - textWidth) / 2.0f,
+            button.y + 8.0f,
             16,
             textColor
         );
@@ -1446,21 +1584,65 @@ void WindWorld::DrawUI()
     );
 
     // Shape selection
-    UIText("Obstacle Shape", 220, 0, 18, DARKGRAY);
+    Rectangle obstacleToolbar = {
+        370.0f,
+        5.0f,
+        420.0f,
+        65.0f
+    };
+
+    DrawRectangleRounded(
+        obstacleToolbar,
+        0.06f,
+        8,
+        Fade(WHITE, 0.88f)
+    );
+
+    DrawRectangleRoundedLines(
+        obstacleToolbar,
+        0.06f,
+        8,
+        Fade(DARKGRAY, 0.35f)
+    );
+
+    UIText("Obstacle shape", 385, 12, 14, DARKGRAY);
 
     auto DrawShapeButton = [&](Rectangle button,
                             const char* text,
                             bool selected)
     {
+        bool hovered = CheckCollisionPointRec(
+            GetMousePosition(),
+            button
+        );
+
         Color buttonColor = selected ? ORANGE : LIGHTGRAY;
         Color textColor = selected ? WHITE : DARKGRAY;
+
+        if (hovered)
+        {
+            buttonColor = selected
+                ? Color{ 255, 175, 60, 255 }
+                : Color{ 245, 230, 210, 255 };
+
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            {
+                buttonColor = Color{ 210, 120, 20, 255 };
+                textColor = WHITE;
+            }
+        }
 
         DrawRectangleRounded(button, 0.25f, 6, buttonColor);
         DrawRectangleRoundedLines(button, 0.25f, 6, DARKGRAY);
 
-        int textWidth = MeasureText(text, 16);
+        float textWidth = MeasureTextEx(
+            uiFont,
+            text,
+            16,
+            1.0f
+        ).x;
 
-        DrawText(
+        UIText(
             text,
             button.x + (button.width - textWidth) / 2,
             button.y + 8,
@@ -1493,11 +1675,31 @@ void WindWorld::DrawUI()
     if (selectedShape == ObstacleShape::Airfoil)
     {
         UIText(
-            "Angle of Attack",
+            "Angle of attack",
             20,
             300,
-            18,
+            16,
             GRAY
+        );
+
+        const char* angleText = TextFormat(
+            "%+.1f degrees",
+            airfoilAngleDegrees
+        );
+
+        float angleTextWidth = MeasureTextEx(
+            uiFont,
+            angleText,
+            14,
+            1.0f
+        ).x;
+
+        UIText(
+            angleText,
+            170.0f - angleTextWidth,
+            350,
+            14,
+            DARKGRAY
         );
 
         DrawRectangleRec(
@@ -1514,76 +1716,216 @@ void WindWorld::DrawUI()
             angleSliderAmount *
             angleSlider.width;
 
+        DrawRectangle(
+            angleSlider.x,
+            angleSlider.y,
+            angleKnobX - angleSlider.x,
+            angleSlider.height,
+            Fade(ORANGE, 0.70f)
+        );
+
+        Rectangle angleSliderHitbox = {
+            angleSlider.x,
+            angleSlider.y - 8.0f,
+            angleSlider.width,
+            angleSlider.height + 16.0f
+        };
+
+        bool angleSliderHovered = CheckCollisionPointRec(
+            GetMousePosition(),
+            angleSliderHitbox
+        );
+
+        Color angleKnobColor =
+            angleSliderHovered ? GRAY : DARKGRAY;
+
+        float angleKnobRadius =
+            angleSliderHovered ? 8.0f : 7.0f;
+
+        if (angleSliderHovered &&
+            IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        {
+            angleKnobColor = ORANGE;
+        }
+
         DrawCircle(
             static_cast<int>(angleKnobX),
             static_cast<int>(
                 angleSlider.y +
                 angleSlider.height / 2.0f
             ),
-            7.0f,
-            DARKGRAY
+            angleKnobRadius,
+            angleKnobColor
         );
 
-        UIText(
-            TextFormat(
-                "%+.1f degrees",
-                airfoilAngleDegrees
-            ),
-            20,
-            365,
-            18,
-            DARKGRAY
+        DrawLine(20, 375, 170, 375, Fade(DARKGRAY, 0.25f));
+
+        auto DrawAirfoilMetric =
+            [&](const char* label,
+                const char* value,
+                float y)
+        {
+            UIText(label, 20, y, 13, GRAY);
+
+            float valueWidth = MeasureTextEx(
+                uiFont,
+                value,
+                14,
+                1.0f
+            ).x;
+
+            UIText(
+                value,
+                170.0f - valueWidth,
+                y,
+                14,
+                DARKGRAY
+            );
+        };
+
+        DrawAirfoilMetric(
+            "Lift coefficient",
+            TextFormat("%+.2f", liftCoefficient),
+            382.0f
         );
 
-        UIText(
-            TextFormat(
-                "Lift Coefficient: %+.2f",
-                liftCoefficient
-            ),
-            20,
-            395,
-            17,
-            DARKGRAY
+        DrawAirfoilMetric(
+            "Lift",
+            TextFormat("%+.2f N/m", liftForce),
+            413.0f
         );
 
-        UIText(
-            TextFormat(
-                "Lift: %+.2f N/m",
-                liftForce
-            ),
-            20,
-            420,
-            17,
-            DARKGRAY
+        DrawAirfoilMetric(
+            "Drag coefficient",
+            TextFormat("%+.2f", dragCoefficient),
+            444.0f
         );
 
-        UIText(
-            TextFormat(
-                "Drag Coefficient: %+.2f",
-                dragCoefficient
-            ),
-            20,
-            465,
-            17,
-            DARKGRAY
-        );
-
-        UIText(
-            TextFormat(
-                "Drag: %.2f N/m",
-                dragForce
-            ),
-            20,
-            490,
-            17,
-            DARKGRAY
+        DrawAirfoilMetric(
+            "Drag",
+            TextFormat("%.2f N/m", dragForce),
+            475.0f
         );
     }
 
+    Rectangle legendPanel = {
+        tunnel.x + tunnel.width - 235.0f,
+        tunnel.y + tunnel.height - 70.0f,
+        220.0f,
+        55.0f
+    };
+
+    DrawRectangleRounded(
+        legendPanel,
+        0.06f,
+        8,
+        Fade(WHITE, 0.88f)
+    );
+
+    DrawRectangleRoundedLines(
+        legendPanel,
+        0.06f,
+        8,
+        Fade(DARKGRAY, 0.35f)
+    );
+
+    const char* legendTitle =
+        particleVisualization == ParticleVisualization::Speed
+        ? "Speed"
+        : "Pressure";
+
+    UIText(
+        legendTitle,
+        legendPanel.x + 10.0f,
+        legendPanel.y + 5.0f,
+        14,
+        DARKGRAY
+    );
+
+    int legendBarX = static_cast<int>(legendPanel.x + 10.0f);
+    int legendBarY = static_cast<int>(legendPanel.y + 22.0f);
+    int legendBarHalfWidth = 100;
+    int legendBarHeight = 8;
+
+    Color legendMiddleColor =
+        particleVisualization == ParticleVisualization::Speed
+        ? GREEN
+        : LIGHTGRAY;
+
+    DrawRectangleGradientH(
+        legendBarX,
+        legendBarY,
+        legendBarHalfWidth,
+        legendBarHeight,
+        BLUE,
+        legendMiddleColor
+    );
+
+    DrawRectangleGradientH(
+        legendBarX + legendBarHalfWidth,
+        legendBarY,
+        legendBarHalfWidth,
+        legendBarHeight,
+        legendMiddleColor,
+        RED
+    );
+
+    const char* leftLegendLabel =
+        particleVisualization == ParticleVisualization::Speed
+        ? "Slow"
+        : "Low";
+
+    const char* middleLegendLabel =
+        particleVisualization == ParticleVisualization::Speed
+        ? "Reference"
+        : "Neutral";
+
+    const char* rightLegendLabel =
+        particleVisualization == ParticleVisualization::Speed
+        ? "Fast"
+        : "High";
+
+    UIText(
+        leftLegendLabel,
+        legendPanel.x + 10.0f,
+        legendPanel.y + 35.0f,
+        12,
+        DARKGRAY
+    );
+
+    float middleLabelWidth = MeasureTextEx(
+        uiFont,
+        middleLegendLabel,
+        12,
+        1.0f
+    ).x;
+
+    UIText(
+        middleLegendLabel,
+        legendPanel.x + legendPanel.width / 2.0f - middleLabelWidth / 2.0f,
+        legendPanel.y + 35.0f,
+        12,
+        DARKGRAY
+    );
+
+    float rightLabelWidth = MeasureTextEx(
+        uiFont,
+        rightLegendLabel,
+        12,
+        1.0f
+    ).x;
+
+    UIText(
+        rightLegendLabel,
+        legendPanel.x + legendPanel.width - rightLabelWidth - 10.0f,
+        legendPanel.y + 35.0f,
+        12,
+        DARKGRAY
+    );
+
     
         
-    UIText("R: Reset", 20, 20, 18, GRAY);
-    UIText("Backspace: Menu", 20, 570, 18, GRAY);
+    UIText("Backspace: Menu", 24, 570, 16, GRAY);
 }
 
 void WindWorld::DrawParticles()

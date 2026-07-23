@@ -7,7 +7,7 @@ void FluidWorld::Reset()
 {
     InitializeFluidRendering();
 
-    tank.x = 180;
+    tank.x = 305;
     tank.y = 80;
     tank.width = 440;
     tank.height = 480;
@@ -350,28 +350,55 @@ void FluidWorld::Draw()
     );
 
     // UI.
-    UIText(
-        "R: Reset",
-        20,
-        20,
-        20,
-        GRAY
+    Rectangle controlsPanel = {
+        10.0f,
+        10.0f,
+        250.0f,
+        130.0f
+    };
+
+    DrawRectangleRounded(
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(BLACK, 0.62f)
     );
 
-    UIText("Hold left-click: Stir fluid", 20, 50, 20, GRAY);
-
-    DrawFPS(
-        20,
-        80
+    DrawRectangleRoundedLines(
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(SKYBLUE, 0.28f)
     );
 
+    UIText(
+        "Fluid simulation",
+        24,
+        20,
+        18,
+        SKYBLUE
+    );
 
+    DrawLine(24, 45, 246, 45, Fade(WHITE, 0.35f));
+
+    UIText("R: Reset", 24, 58, 16, GRAY);
+    UIText("Hold left-click: Stir fluid", 24, 82, 16, GRAY);
+
+    UIText("FPS", 24, 106, 16, GRAY);
 
     UIText(
-        "BACKSPACE: Menu",
-        20,
-        580,
-        20,
+        TextFormat("%i", GetFPS()),
+        119,
+        106,
+        16,
+        GREEN
+    );
+
+    UIText(
+        "Backspace: Menu",
+        24,
+        570,
+        16,
         GRAY
     );
 }

@@ -1,5 +1,6 @@
 #include "OrbitalWorld.h"
 #include <cmath>
+#include <algorithm>
 #include "UI.h"
 
 void OrbitalWorld::Reset()
@@ -60,9 +61,34 @@ void OrbitalWorld::GenerateStars()
 
 void OrbitalWorld::HandleInput()
 {
+    Vector2 mousePosition = GetMousePosition();
+
+    Rectangle radiusSliderHitbox = {
+        spawnRadiusSlider.x,
+        spawnRadiusSlider.y - 8.0f,
+        spawnRadiusSlider.width,
+        spawnRadiusSlider.height + 16.0f
+    };
+
+    bool mouseOverRadiusSlider = CheckCollisionPointRec(
+        mousePosition,
+        radiusSliderHitbox
+    );
+
+    if (mouseOverRadiusSlider &&
+        IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        float sliderAmount =
+            (mousePosition.x - spawnRadiusSlider.x) /
+            spawnRadiusSlider.width;
+
+        sliderAmount = std::clamp(sliderAmount, 0.0f, 1.0f);
+        spawnRadius = roundf(5.0f + sliderAmount * 45.0f);
+    }
+
     if (IsKeyPressed(KEY_Q))
     {
-        Vector2 position = GetMousePosition();
+        Vector2 position = mousePosition;
 
         float G = 500.0f;
 
@@ -82,7 +108,8 @@ void OrbitalWorld::HandleInput()
             SpawnPlanet(position, velocity);
         }
     }
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+        !mouseOverRadiusSlider)
     {
         dragStart = GetMousePosition();
         dragCurrent = dragStart;
@@ -631,50 +658,127 @@ void OrbitalWorld::DrawOrbitPrediction()
 
 void OrbitalWorld::DrawUI()
 {   
+    Rectangle controlsPanel = {
+        10.0f,
+        5.0f,
+        320.0f,
+        460.0f
+    };
+
     DrawRectangleRounded(
-    {15,15,320,430},
-    0.1f,
-    10,
-    Fade(BLACK,0.35f)
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(BLACK, 0.55f)
     );
 
-    UIText("Left click + drag: Manual launch", 20, 20, 16, SKYBLUE);
-    UIText("Right click: Open planet info", 20, 45, 16, SKYBLUE);
+    DrawRectangleRoundedLines(
+        controlsPanel,
+        0.06f,
+        8,
+        Fade(SKYBLUE, 0.22f)
+    );
+
+    UIText("Left click + drag: Manual launch", 24, 20, 16, SKYBLUE);
+    UIText("Right click: Open planet info", 24, 45, 16, SKYBLUE);
     DrawSelectedPlanetInfo();
 
-    DrawLine(20, 70, 140, 70, WHITE);
+    DrawLine(24, 70, 316, 70, Fade(WHITE, 0.45f));
 
-    UIText("Q: Stable orbit", 20, 95, 16, SKYBLUE);
-    UIText("R: Reset", 20, 120, 16, SKYBLUE);
-    UIText(TextFormat("[: decrease radius, ]: Increase radius (%.1f)", spawnRadius), 20, 145, 16, SKYBLUE);
+    UIText("Q: Stable orbit", 24, 95, 16, SKYBLUE);
+    UIText("R: Reset", 24, 120, 16, SKYBLUE);
+    UIText("Spawn radius", 24, 145, 16, SKYBLUE);
 
-    DrawLine(20, 170, 140, 170, WHITE);
+    const char* radiusText = TextFormat("%.0f", spawnRadius);
+    float radiusTextWidth = MeasureTextEx(
+        uiFont,
+        radiusText,
+        14,
+        1.0f
+    ).x;
+
+    UIText(
+        radiusText,
+        316.0f - radiusTextWidth,
+        145,
+        14,
+        SKYBLUE
+    );
+
+    float radiusSliderAmount = (spawnRadius - 5.0f) / 45.0f;
+    float radiusKnobX =
+        spawnRadiusSlider.x +
+        radiusSliderAmount * spawnRadiusSlider.width;
+
+    DrawRectangleRec(spawnRadiusSlider, Fade(WHITE, 0.35f));
+    DrawRectangle(
+        spawnRadiusSlider.x,
+        spawnRadiusSlider.y,
+        radiusKnobX - spawnRadiusSlider.x,
+        spawnRadiusSlider.height,
+        Fade(SKYBLUE, 0.80f)
+    );
+
+    Rectangle radiusSliderHitbox = {
+        spawnRadiusSlider.x,
+        spawnRadiusSlider.y - 8.0f,
+        spawnRadiusSlider.width,
+        spawnRadiusSlider.height + 16.0f
+    };
+
+    bool radiusSliderHovered = CheckCollisionPointRec(
+        GetMousePosition(),
+        radiusSliderHitbox
+    );
+
+    Color radiusKnobColor =
+        radiusSliderHovered ? LIGHTGRAY : GRAY;
+
+    float radiusKnobSize =
+        radiusSliderHovered ? 8.0f : 7.0f;
+
+    if (radiusSliderHovered &&
+        IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+    {
+        radiusKnobColor = SKYBLUE;
+    }
+
+    DrawCircle(
+        radiusKnobX,
+        spawnRadiusSlider.y + spawnRadiusSlider.height / 2.0f,
+        radiusKnobSize,
+        radiusKnobColor
+    );
+
+    DrawLine(24, 185, 316, 185, Fade(WHITE, 0.45f));
 
 
-    UIText("V: Toggle velocity vectors", 20, 195, 16, SKYBLUE);
-    UIText("T: Toggle Trials", 20, 220, 16, SKYBLUE);
-    UIText("G: Toggle planet gravity", 20, 245, 16, SKYBLUE);
-    UIText(usePlanetGravity ? "Planet Gravity: ON" : "Planet Gravity: OFF",
-        20,
+    UIText("V: Velocity vectors", 24, 195, 16, SKYBLUE);
+    UIText("T: Trails", 24, 220, 16, SKYBLUE);
+    UIText("G: Planet gravity", 24, 245, 16, SKYBLUE);
+    UIText(usePlanetGravity ? "Planet gravity: ON" : "Planet gravity: OFF",
+        24,
         270,
         16,
         usePlanetGravity ? GREEN : ORANGE
     );
 
-    DrawLine(20, 295, 140, 295, WHITE);
+    DrawLine(24, 295, 316, 295, Fade(WHITE, 0.45f));
 
-    UIText("P: Pause", 20, 320, 16, SKYBLUE);
-    UIText("Period (.): step frame", 20, 345, 16, SKYBLUE);
+    UIText("P: Pause", 24, 320, 16, SKYBLUE);
+    UIText("Period (.): Step frame", 24, 345, 16, SKYBLUE);
     if (simulationPaused)
     {
-        UIText("Status: PAUSED", 20, 370, 16, ORANGE);
+        UIText("Status: PAUSED", 24, 370, 16, ORANGE);
     }
     else
     {
-        UIText("Status: RUNNING", 20, 370, 16, GREEN);
+        UIText("Status: RUNNING", 24, 370, 16, GREEN);
     }
-    UIText(TextFormat("Time Scale: %.1fx", timeScale), 20, 395, 16, SKYBLUE);
-    UIText("- / = : Adjust time scale", 20, 420, 16, SKYBLUE);
+    UIText(TextFormat("Time scale: %.1fx", timeScale), 24, 395, 16, SKYBLUE);
+    UIText("- / =: Adjust time scale", 24, 420, 16, SKYBLUE);
+
+    UIText("Backspace: Menu", 24, 570, 16, GRAY);
 
     /* DrawText("M: spawn moon on selected planet", 20, 210, 20, GRAY); */
 }
@@ -719,17 +823,50 @@ void OrbitalWorld::DrawSelectedPlanetInfo()
         planet.velocity.x * planet.velocity.x +
         planet.velocity.y * planet.velocity.y);
 
-    DrawRectangle(560, 20, 220, 100, Fade(WHITE, 0.8f));
+    Rectangle infoPanel = {
+        790.0f,
+        10.0f,
+        250.0f,
+        150.0f
+    };
 
-    UIText("Planet Info", 575, 20, 16, DARKBLUE);
+    DrawRectangleRounded(
+        infoPanel,
+        0.06f,
+        8,
+        Fade(BLACK, 0.62f)
+    );
 
-    UILabelValue("Speed:", TextFormat("%.1f", speed), 575, 40);
+    DrawRectangleRoundedLines(
+        infoPanel,
+        0.06f,
+        8,
+        Fade(SKYBLUE, 0.28f)
+    );
 
-    UILabelValue("Distance:", TextFormat("  %.1f", distance), 575, 60);
+    float labelX = infoPanel.x + 14.0f;
+    float valueX = infoPanel.x + 115.0f;
 
-    UILabelValue("Mass:", TextFormat("%.1f", planet.mass), 575, 80);
-    
-    UILabelValue("Radius:", TextFormat("%.1f", planet.radius), 575, 100);
+    UIText("Planet info", labelX, infoPanel.y + 10.0f, 18, SKYBLUE);
+    DrawLine(
+        labelX,
+        infoPanel.y + 34.0f,
+        infoPanel.x + infoPanel.width - 14.0f,
+        infoPanel.y + 34.0f,
+        Fade(WHITE, 0.35f)
+    );
+
+    UIText("Speed", labelX, infoPanel.y + 45.0f, 14, SKYBLUE);
+    UIText(TextFormat("%.1f", speed), valueX, infoPanel.y + 45.0f, 14, WHITE);
+
+    UIText("Distance", labelX, infoPanel.y + 68.0f, 14, SKYBLUE);
+    UIText(TextFormat("%.1f", distance), valueX, infoPanel.y + 68.0f, 14, WHITE);
+
+    UIText("Mass", labelX, infoPanel.y + 91.0f, 14, SKYBLUE);
+    UIText(TextFormat("%.1f", planet.mass), valueX, infoPanel.y + 91.0f, 14, WHITE);
+
+    UIText("Radius", labelX, infoPanel.y + 114.0f, 14, SKYBLUE);
+    UIText(TextFormat("%.1f", planet.radius), valueX, infoPanel.y + 114.0f, 14, WHITE);
 }
 
 /*void OrbitalWorld::SpawnMoon()

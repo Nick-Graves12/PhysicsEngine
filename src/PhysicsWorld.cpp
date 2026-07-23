@@ -89,7 +89,7 @@ void PhysicsWorld::Reset()
 {
     bodies.clear();
 
-    arena = {170, 70, 495, 430};
+    arena = {278, 70, 495, 430};
 
     float startX = arena.x + arena.width / 2.0f;
     float startY = arena.y + arena.height / 2.0f;

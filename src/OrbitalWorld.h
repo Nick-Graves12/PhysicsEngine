@@ -79,9 +79,11 @@ private:
     bool simulationPaused = false;
     bool usePlanetGravity = true;
     float timeScale = 1.0f;
+    Rectangle spawnRadiusSlider = {
+        24.0f, 170.0f, 292.0f, 6.0f
+    };
     void DrawOrbitPrediction();
     
 };
-
 
 
