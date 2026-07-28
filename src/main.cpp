@@ -1651,6 +1651,7 @@ int main()
 
                     body.position.x = currentMouse.x + dragOffset.x;
                     body.position.y = currentMouse.y + dragOffset.y;
+                    world.ConstrainBodyToArena(body);
 
                     body.velocity.x = (currentMouse.x - previousMousePosition.x) / frameTime;
                     body.velocity.y = (currentMouse.y - previousMousePosition.y) / frameTime;

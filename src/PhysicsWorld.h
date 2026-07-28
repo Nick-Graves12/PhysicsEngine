@@ -18,6 +18,7 @@ public:
     int GetBodyCount() const;
     void Reset();
     void RemoveBody(int index);
+    void ConstrainBodyToArena(RigidBody& body);
 
 private:
     std::vector<RigidBody> bodies;

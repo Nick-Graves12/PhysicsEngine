@@ -73,26 +73,26 @@ This project is being developed as a long-term learning project to explore:
 ## Screenshots
 -Main Menu
 
-![Main Menu](screenshots/menu-v3.png)
+![Main Menu](screenshots/menu-updated.gif)
 
 
 ## Collision Sandbox
 
-![Collision Sandbox](screenshots/collision-sim-demo.gif)
+![Collision Sandbox](screenshots/collision-sim-demo-updated.gif)
 
 
 ## Ortbital Sandbox
 
-![Orbital Sandbox](screenshots/orbital-sim-demo.gif)
+![Orbital Sandbox](screenshots/orbital-sim-demo-updated.gif)
 
 
 ## Fluid Sandbox
 
-![Fluid Sandbox](screenshots/fluid-sim-demo.gif)
+![Fluid Sandbox](screenshots/fluid-sim-demo-updated.gif)
 
 ## Wind Sandbox
 
-![Fluid Sandbox](screenshots/wind-sim-demo2.gif)
+![Fluid Sandbox](screenshots/wind-sim-demo-updated.gif)
 
 
 ## How to Build

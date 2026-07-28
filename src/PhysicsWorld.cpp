@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "Physics.h"
 #include "Collision.h"
+#include <algorithm>
 
 void PhysicsWorld::Step(float dt)
 {
@@ -102,6 +103,19 @@ void PhysicsWorld::Reset()
     AddBody(player);
 }
 
+void PhysicsWorld::ConstrainBodyToArena(RigidBody& body)
+{
+    body.position.x = std::clamp(
+        body.position.x,
+        arena.x + body.radius,
+        arena.x + arena.width - body.radius
+    );
+    body.position.y = std::clamp(
+        body.position.y,
+        arena.y + body.radius,
+        arena.y + arena.height - body.radius
+    );
+}
 
 void PhysicsWorld::CheckArenaCollision(RigidBody& body)
 {
